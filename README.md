@@ -1,11 +1,12 @@
 ---
-title: Privacy Guardian Env
-emoji: 🏢
-colorFrom: gray
-colorTo: purple
+title: Privacy Guardian PII Redaction Environment
+emoji: 🔒
+colorFrom: blue
+colorTo: green
 sdk: docker
 pinned: false
-license: mit
+tags:
+  - openenv
+  - pii
+  - gdpr
 ---
-
-Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference

@@ -1,0 +1,32 @@
+spec_version: 1
+name: privacy-guardian-env
+type: environment
+runtime: docker
+app: server/app.py
+port: 7860
+
+metadata:
+  title: "Privacy Guardian — PII Redaction Environment"
+  description: >
+    An RL environment where an AI agent acts as a Data Privacy Officer.
+    Given documents containing Personally Identifiable Information (PII),
+    the agent must identify and redact sensitive data according to GDPR/HIPAA
+    compliance rules while preserving the analytical utility of the document.
+  tags:
+    - openenv
+    - pii
+    - gdpr
+    - privacy
+    - compliance
+    - nlp
+  difficulty: easy-to-hard
+  tasks:
+    - name: pattern_redaction
+      difficulty: easy
+      description: "Redact obvious PII patterns — emails, phone numbers, credit cards"
+    - name: contextual_redaction
+      difficulty: medium
+      description: "Identify and redact contextual PII embedded in natural language"
+    - name: utility_preserving_redaction
+      difficulty: hard
+      description: "Redact PII while preserving medical/financial analytical value"
