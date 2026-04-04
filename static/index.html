@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Privacy Guardian — Enterprise PII Compliance Platform</title>
+<style>
+:root {
+  --bg0: #0b0d14; --bg1: #111520; --bg2: #161b2a; --bg3: #1d2438;
+  --border: #252d42; --border2: #2e3a55;
+  --text1: #e8edf5; --text2: #8a9bb8; --text3: #4a5a78;
+  --blue: #3b7ef0; --blue-dim: #1a3a6e;
+  --green: #22c55e; --green-dim: #0f3d1f;
+  --red: #ef4444; --red-dim: #3d0f0f;
+  --amber: #f59e0b; --amber-dim: #3d2a06;
+  --purple: #a855f7; --purple-dim: #2d1a4a;
+  --teal: #14b8a6; --teal-dim: #0a2e2b;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Segoe UI', sans-serif; background: var(--bg0); color: var(--text1); min-height: 100vh; font-size: 13px; }
+
+/* NAV */
+nav { background: var(--bg1); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; height: 52px; gap: 24px; position: sticky; top: 0; z-index: 100; }
+.nav-brand { display: flex; align-items: center; gap: 10px; }
+.nav-logo { width: 30px; height: 30px; background: var(--blue); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.nav-title { font-size: 15px; font-weight: 600; color: var(--text1); }
+.nav-subtitle { font-size: 11px; color: var(--text2); }
+.nav-sep { width: 1px; height: 28px; background: var(--border); }
+.nav-tabs { display: flex; gap: 4px; }
+.nav-tab { padding: 6px 14px; border-radius: 6px; color: var(--text2); cursor: pointer; font-size: 12px; transition: all .15s; border: none; background: none; }
+.nav-tab:hover { background: var(--bg2); color: var(--text1); }
+.nav-tab.active { background: var(--bg3); color: var(--blue); }
+.nav-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.compliance-badges { display: flex; gap: 6px; }
+.cbadge { padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 600; letter-spacing: .5px; cursor: pointer; border: 1px solid transparent; transition: all .15s; }
+.cbadge.gdpr  { background: #1a2a4a; color: #60a5fa; border-color: #2a4a7a; }
+.cbadge.hipaa { background: #1a3a1a; color: #4ade80; border-color: #2a6a2a; }
+.cbadge.ccpa  { background: #3a2a1a; color: #fbbf24; border-color: #6a4a1a; }
+.cbadge.active-f { opacity: .5; }
+
+/* MAIN LAYOUT */
+.main { display: grid; grid-template-columns: 280px 1fr 320px; grid-template-rows: auto 1fr; gap: 0; height: calc(100vh - 52px); overflow: hidden; }
+
+/* LEFT SIDEBAR */
+.sidebar { background: var(--bg1); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+.sidebar-section { padding: 16px; border-bottom: 1px solid var(--border); }
+.sidebar-label { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+
+/* Task cards */
+.task-card { padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg2); cursor: pointer; transition: all .15s; margin-bottom: 8px; }
+.task-card:hover { border-color: var(--border2); }
+.task-card.active { border-color: var(--blue); background: var(--blue-dim); }
+.task-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.task-name { font-size: 12px; font-weight: 600; color: var(--text1); }
+.diff-pill { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+.diff-easy   { background: var(--green-dim); color: var(--green); }
+.diff-medium { background: var(--amber-dim); color: var(--amber); }
+.diff-hard   { background: var(--red-dim);   color: var(--red); }
+.task-desc { font-size: 11px; color: var(--text2); line-height: 1.5; }
+.task-meta { display: flex; gap: 8px; margin-top: 8px; }
+.task-tag { font-size: 10px; padding: 2px 6px; background: var(--bg3); border-radius: 4px; color: var(--text2); }
+
+/* Metrics */
+.metric-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.metric { background: var(--bg2); border-radius: 8px; padding: 12px; border: 1px solid var(--border); }
+.metric-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.metric-value { font-size: 22px; font-weight: 700; color: var(--text1); }
+.metric-sub { font-size: 10px; color: var(--text2); margin-top: 2px; }
+.metric-value.green { color: var(--green); }
+.metric-value.red   { color: var(--red); }
+.metric-value.amber { color: var(--amber); }
+
+/* PII category breakdown */
+.pii-type { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.pii-type:last-child { border-bottom: none; }
+.pii-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; flex-shrink: 0; }
+.pii-type-name { font-size: 11px; color: var(--text2); flex: 1; }
+.pii-count { font-size: 11px; font-weight: 600; color: var(--text1); }
+
+/* CENTER: Document workspace */
+.workspace { display: flex; flex-direction: column; overflow: hidden; }
+.workspace-toolbar { background: var(--bg1); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; align-items: center; gap: 12px; }
+.toolbar-title { font-size: 12px; font-weight: 600; color: var(--text1); }
+.toolbar-sep { width: 1px; height: 20px; background: var(--border); }
+.doc-select { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; color: var(--text1); padding: 5px 10px; font-size: 12px; outline: none; }
+.btn { padding: 7px 16px; border-radius: 6px; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 6px; }
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary:hover { background: #2d6fd4; }
+.btn-primary:disabled { background: var(--bg3); color: var(--text3); cursor: not-allowed; }
+.btn-ghost { background: var(--bg2); color: var(--text2); border: 1px solid var(--border); }
+.btn-ghost:hover { border-color: var(--border2); color: var(--text1); }
+.btn-success { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+.ml-auto { margin-left: auto; }
+
+/* Split document view */
+.doc-panels { display: grid; grid-template-columns: 1fr 1fr; flex: 1; overflow: hidden; gap: 0; }
+.doc-panel { display: flex; flex-direction: column; overflow: hidden; }
+.doc-panel + .doc-panel { border-left: 1px solid var(--border); }
+.doc-panel-header { padding: 10px 16px; background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.doc-panel-title { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; }
+.doc-content { flex: 1; overflow-y: auto; padding: 16px; font-size: 12px; line-height: 1.8; color: var(--text1); white-space: pre-wrap; word-break: break-word; font-family: 'SF Mono', 'Fira Code', monospace; background: var(--bg0); }
+.doc-content.editable { outline: none; caret-color: var(--blue); }
+.doc-content.editable:focus { box-shadow: inset 2px 0 0 var(--blue); }
+.doc-bottom { border-top: 1px solid var(--border); padding: 12px 16px; background: var(--bg1); display: flex; gap: 10px; align-items: center; }
+
+/* PII highlight colors */
+.pii-email  { background: rgba(59,126,240,.2); color: #93c5fd; border-radius: 3px; padding: 1px 4px; }
+.pii-phone  { background: rgba(168,85,247,.2); color: #c4b5fd; border-radius: 3px; padding: 1px 4px; }
+.pii-card   { background: rgba(239,68,68,.2);  color: #fca5a5; border-radius: 3px; padding: 1px 4px; }
+.pii-id     { background: rgba(245,158,11,.2); color: #fcd34d; border-radius: 3px; padding: 1px 4px; }
+.pii-name   { background: rgba(20,184,166,.2); color: #5eead4; border-radius: 3px; padding: 1px 4px; }
+.pii-loc    { background: rgba(34,197,94,.2);  color: #86efac; border-radius: 3px; padding: 1px 4px; }
+.redacted-tag { background: var(--bg3); color: var(--text2); border-radius: 3px; padding: 1px 6px; font-size: 11px; border: 1px solid var(--border2); }
+
+/* RIGHT SIDEBAR */
+.right-panel { background: var(--bg1); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.rp-section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.rp-label { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+
+/* Score gauge */
+.score-ring-wrap { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+.score-ring { position: relative; width: 80px; height: 80px; flex-shrink: 0; }
+.score-ring svg { transform: rotate(-90deg); }
+.score-ring-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: var(--text1); }
+.score-breakdown { flex: 1; }
+.score-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.score-row-label { font-size: 11px; color: var(--text2); width: 80px; flex-shrink: 0; }
+.score-bar-bg { flex: 1; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+.score-bar-fill { height: 6px; border-radius: 3px; transition: width .5s; }
+.score-row-val { font-size: 11px; font-weight: 600; color: var(--text1); width: 30px; text-align: right; }
+
+/* Audit log */
+.audit-log { flex: 1; overflow-y: auto; }
+.audit-entry { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; }
+.audit-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+.audit-icon.ok  { background: var(--green-dim); }
+.audit-icon.err { background: var(--red-dim); }
+.audit-icon.info{ background: var(--blue-dim); }
+.audit-icon.warn{ background: var(--amber-dim); }
+.audit-body { flex: 1; }
+.audit-title { font-size: 12px; font-weight: 600; color: var(--text1); margin-bottom: 2px; }
+.audit-detail { font-size: 11px; color: var(--text2); line-height: 1.4; }
+.audit-time { font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+/* Step progress */
+.step-track { display: flex; align-items: center; gap: 0; }
+.step-node { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--text3); transition: all .3s; flex-shrink: 0; }
+.step-node.done    { background: var(--green); border-color: var(--green); color: #fff; }
+.step-node.current { background: var(--blue); border-color: var(--blue); color: #fff; }
+.step-line { flex: 1; height: 2px; background: var(--border); transition: background .3s; }
+.step-line.done { background: var(--green); }
+
+/* Compliance legend */
+.legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text2); padding: 4px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+/* Status bar */
+.statusbar { background: var(--bg2); border-top: 1px solid var(--border); padding: 6px 20px; display: flex; align-items: center; gap: 16px; font-size: 11px; color: var(--text3); }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 4px; }
+.status-dot.idle { background: var(--text3); }
+.status-dot.running { background: var(--amber); animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* Notification toast */
+.toast { position: fixed; bottom: 24px; right: 24px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; font-size: 12px; color: var(--text1); z-index: 999; transform: translateX(120%); transition: transform .3s; max-width: 280px; }
+.toast.show { transform: translateX(0); }
+.toast.success { border-color: var(--green); }
+.toast.error   { border-color: var(--red); }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">
+    <div class="nav-logo">🔒</div>
+    <div>
+      <div class="nav-title">Privacy Guardian</div>
+      <div class="nav-subtitle">Enterprise PII Compliance Platform</div>
+    </div>
+  </div>
+  <div class="nav-sep"></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active">Redaction Workspace</button>
+    <button class="nav-tab" onclick="window.open('/docs','_blank')">API Reference</button>
+    <button class="nav-tab" onclick="window.open('/schema','_blank')">Schema</button>
+  </div>
+  <div class="nav-right">
+    <div class="compliance-badges">
+      <span class="cbadge gdpr" title="GDPR Mode Active">GDPR</span>
+      <span class="cbadge hipaa">HIPAA</span>
+      <span class="cbadge ccpa">CCPA</span>
+    </div>
+    <div id="env-status" style="font-size:11px;color:var(--text3);">
+      <span class="status-dot idle" id="status-dot"></span><span id="status-text">Idle</span>
+    </div>
+  </div>
+</nav>
+
+<div class="main">
+
+<!-- LEFT SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-section">
+    <div class="sidebar-label">Compliance Tasks</div>
+
+    <div class="task-card active" id="task-easy" onclick="selectTask('pattern_redaction','easy',this)">
+      <div class="task-card-header">
+        <span class="task-name">Pattern Redaction</span>
+        <span class="diff-pill diff-easy">EASY</span>
+      </div>
+      <div class="task-desc">Detect and redact structured PII — emails, phone numbers, payment cards, national IDs using pattern matching.</div>
+      <div class="task-meta">
+        <span class="task-tag">GDPR Art.4</span>
+        <span class="task-tag">PCI-DSS</span>
+        <span class="task-tag">Regex</span>
+      </div>
+    </div>
+
+    <div class="task-card" id="task-medium" onclick="selectTask('contextual_redaction','medium',this)">
+      <div class="task-card-header">
+        <span class="task-name">Contextual NER</span>
+        <span class="diff-pill diff-medium">MEDIUM</span>
+      </div>
+      <div class="task-desc">Identify PII embedded in natural language — named entities, locations, and relational references without explicit labels.</div>
+      <div class="task-meta">
+        <span class="task-tag">NER</span>
+        <span class="task-tag">GDPR Art.17</span>
+        <span class="task-tag">NLP</span>
+      </div>
+    </div>
+
+    <div class="task-card" id="task-hard" onclick="selectTask('utility_preserving_redaction','hard',this)">
+      <div class="task-card-header">
+        <span class="task-name">Utility-Preserving</span>
+        <span class="diff-pill diff-hard">HARD</span>
+      </div>
+      <div class="task-desc">Redact PII while preserving medical, financial, and HR analytical value for downstream research use — HIPAA Safe Harbor Method.</div>
+      <div class="task-meta">
+        <span class="task-tag">HIPAA §164</span>
+        <span class="task-tag">Safe Harbor</span>
+        <span class="task-tag">Research</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Session Metrics</div>
+    <div class="metric-row">
+      <div class="metric">
+        <div class="metric-label">PII Removed</div>
+        <div class="metric-value green" id="m-pii">0</div>
+        <div class="metric-sub">items redacted</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Avg Score</div>
+        <div class="metric-value" id="m-score">—</div>
+        <div class="metric-sub">compliance rate</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Documents</div>
+        <div class="metric-value" id="m-docs">0</div>
+        <div class="metric-sub">processed</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Episodes</div>
+        <div class="metric-value" id="m-eps">0</div>
+        <div class="metric-sub">completed</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">PII Legend</div>
+    <div id="pii-legend">
+      <div class="pii-type"><div class="pii-dot" style="background:#3b7ef0"></div><span class="pii-type-name">Email Address</span><span class="pii-count" id="l-email">0</span></div>
+      <div class="pii-type"><div class="pii-dot" style="background:#a855f7"></div><span class="pii-type-name">Phone Number</span><span class="pii-count" id="l-phone">0</span></div>
+      <div class="pii-type"><div class="pii-dot" style="background:#ef4444"></div><span class="pii-type-name">Payment Card</span><span class="pii-count" id="l-card">0</span></div>
+      <div class="pii-type"><div class="pii-dot" style="background:#f59e0b"></div><span class="pii-type-name">National ID</span><span class="pii-count" id="l-id">0</span></div>
+      <div class="pii-type"><div class="pii-dot" style="background:#14b8a6"></div><span class="pii-type-name">Person Name</span><span class="pii-count" id="l-name">0</span></div>
+      <div class="pii-type"><div class="pii-dot" style="background:#22c55e"></div><span class="pii-type-name">Location</span><span class="pii-count" id="l-loc">0</span></div>
+    </div>
+  </div>
+
+  <div class="sidebar-section" style="margin-top:auto;">
+    <div class="sidebar-label">Environment</div>
+    <div style="font-size:11px;color:var(--text2);line-height:1.7;">
+      <div>OpenEnv v1.0 Compatible</div>
+      <div>Endpoint: <span style="color:var(--blue)">/reset /step /state</span></div>
+      <div>Tasks: 3 | Max Steps: 3</div>
+    </div>
+  </div>
+</div>
+
+<!-- CENTER WORKSPACE -->
+<div class="workspace">
+  <div class="workspace-toolbar">
+    <span class="toolbar-title">Document Workspace</span>
+    <div class="toolbar-sep"></div>
+    <select class="doc-select" id="doc-picker" onchange="loadDocPreview()">
+      <option value="">Select document type...</option>
+      <option value="customer_support">Customer Support Log</option>
+      <option value="medical_record">Medical Record</option>
+      <option value="financial">Financial Document</option>
+      <option value="hr">HR Report</option>
+    </select>
+    <div class="toolbar-sep"></div>
+    <!-- Step progress -->
+    <div class="step-track" id="step-track">
+      <div class="step-node current" id="sn1">1</div>
+      <div class="step-line" id="sl1"></div>
+      <div class="step-node" id="sn2">2</div>
+      <div class="step-line" id="sl2"></div>
+      <div class="step-node" id="sn3">3</div>
+    </div>
+    <div class="ml-auto" style="display:flex;gap:8px;">
+      <button class="btn btn-ghost" onclick="doReset()">↺ New Episode</button>
+      <button class="btn btn-ghost" onclick="copyOriginal()">⎘ Copy Original</button>
+      <button class="btn btn-primary" id="submit-btn" onclick="doStep()" disabled>▶ Submit Redaction</button>
+    </div>
+  </div>
+
+  <div class="doc-panels">
+    <!-- ORIGINAL -->
+    <div class="doc-panel">
+      <div class="doc-panel-header">
+        <span class="doc-panel-title">Original Document</span>
+        <span id="pii-scan-badge" style="font-size:10px;padding:2px 8px;background:var(--red-dim);color:var(--red);border-radius:20px;display:none;">PII Detected</span>
+      </div>
+      <div class="doc-content" id="original-doc">Click "New Episode" to load a document for redaction...</div>
+      <div class="doc-bottom">
+        <span style="color:var(--text3);font-size:11px;" id="orig-wordcount">0 words</span>
+        <span style="color:var(--text3);font-size:11px;margin-left:auto;" id="pii-detected-count">0 PII items detected</span>
+      </div>
+    </div>
+
+    <!-- REDACTED (editable) -->
+    <div class="doc-panel">
+      <div class="doc-panel-header">
+        <span class="doc-panel-title">Redacted Version</span>
+        <span id="compliance-badge" style="font-size:10px;padding:2px 8px;background:var(--bg3);color:var(--text3);border-radius:20px;">Not submitted</span>
+      </div>
+      <div class="doc-content editable" id="redacted-doc" contenteditable="true" spellcheck="false" oninput="onRedactedInput()" placeholder="Edit this document — replace PII with [NAME] [EMAIL] [PHONE] [CREDIT_CARD] [AADHAAR] [ADDRESS] [ID]">Start a new episode to begin redacting...</div>
+      <div class="doc-bottom">
+        <span style="color:var(--text3);font-size:11px;" id="redact-wordcount">0 words</span>
+        <div style="margin-left:auto;display:flex;gap:6px;">
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="autoRedact()">[AUTO] Quick Tag</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div class="right-panel">
+  <div class="rp-section">
+    <div class="rp-label">Compliance Score</div>
+    <div class="score-ring-wrap">
+      <div class="score-ring">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="34" fill="none" stroke="#1d2438" stroke-width="8"/>
+          <circle cx="40" cy="40" r="34" fill="none" stroke="#3b7ef0" stroke-width="8"
+            stroke-dasharray="213.6" stroke-dashoffset="213.6"
+            id="score-circle" stroke-linecap="round" style="transition:stroke-dashoffset .6s,stroke .6s"/>
+        </svg>
+        <div class="score-ring-num" id="score-num">—</div>
+      </div>
+      <div class="score-breakdown">
+        <div class="score-row">
+          <span class="score-row-label">PII Removal</span>
+          <div class="score-bar-bg"><div class="score-bar-fill" id="sb-pii" style="width:0%;background:var(--blue)"></div></div>
+          <span class="score-row-val" id="sv-pii">—</span>
+        </div>
+        <div class="score-row">
+          <span class="score-row-label">Utility Kept</span>
+          <div class="score-bar-bg"><div class="score-bar-fill" id="sb-util" style="width:0%;background:var(--green)"></div></div>
+          <span class="score-row-val" id="sv-util">—</span>
+        </div>
+        <div class="score-row">
+          <span class="score-row-label">Coverage</span>
+          <div class="score-bar-bg"><div class="score-bar-fill" id="sb-cov" style="width:0%;background:var(--purple)"></div></div>
+          <span class="score-row-val" id="sv-cov">—</span>
+        </div>
+      </div>
+    </div>
+    <div id="feedback-area" style="font-size:11px;color:var(--text2);line-height:1.6;padding:10px;background:var(--bg2);border-radius:6px;border:1px solid var(--border);min-height:40px;">
+      Submit a redaction to see compliance feedback.
+    </div>
+  </div>
+
+  <div class="rp-section">
+    <div class="rp-label">Current State</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;">
+      <div style="color:var(--text3);">Task</div><div id="st-task" style="color:var(--text1);text-align:right;">—</div>
+      <div style="color:var(--text3);">Episode</div><div id="st-ep" style="color:var(--text1);text-align:right;font-family:monospace;font-size:10px;">—</div>
+      <div style="color:var(--text3);">Step</div><div id="st-step" style="color:var(--text1);text-align:right;">—</div>
+      <div style="color:var(--text3);">Total Reward</div><div id="st-reward" style="color:var(--green);text-align:right;font-weight:600;">0.00</div>
+      <div style="color:var(--text3);">PII Found</div><div id="st-pii" style="color:var(--text1);text-align:right;">0 / 0</div>
+    </div>
+  </div>
+
+  <div class="rp-section" style="flex:1;display:flex;flex-direction:column;overflow:hidden;padding-bottom:0;">
+    <div class="rp-label">Audit Trail</div>
+    <div class="audit-log" id="audit-log">
+      <div style="padding:20px;text-align:center;color:var(--text3);font-size:11px;">No audit entries yet</div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- STATUS BAR -->
+<div class="statusbar" style="grid-column:1/-1;">
+  <span><span class="status-dot" id="sb-dot"></span><span id="sb-status">Environment ready</span></span>
+  <span style="color:var(--border2)">|</span>
+  <span>OpenEnv v1.0</span>
+  <span style="color:var(--border2)">|</span>
+  <span>API: <a href="/docs" target="_blank" style="color:var(--blue);text-decoration:none;">/docs</a></span>
+  <span style="color:var(--border2)">|</span>
+  <span id="sb-time"></span>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let currentTask = 'pattern_redaction';
+let currentDoc  = '';
+let sessionPii = 0, sessionDocs = 0, sessionEps = 0;
+let scores = [];
+let auditLog = [];
+let emailCount=0, phoneCount=0, cardCount=0, idCount=0, nameCount=0, locCount=0;
+
+// Time
+setInterval(() => {
+  document.getElementById('sb-time').textContent = new Date().toLocaleTimeString();
+}, 1000);
+
+function selectTask(task, diff, el) {
+  currentTask = task;
+  document.querySelectorAll('.task-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function setStatus(s, text) {
+  const dot = document.getElementById('status-dot');
+  const sbdot = document.getElementById('sb-dot');
+  dot.className = 'status-dot ' + s;
+  sbdot.className = 'status-dot ' + s;
+  document.getElementById('status-text').textContent = text;
+  document.getElementById('sb-status').textContent = text;
+}
+
+function showToast(msg, type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+function updateSteps(current) {
+  for(let i=1;i<=3;i++) {
+    const node = document.getElementById('sn'+i);
+    const line = document.getElementById('sl'+i);
+    node.className = 'step-node' + (i < current ? ' done' : i === current ? ' current' : '');
+    node.textContent = i < current ? '✓' : i;
+    if(line) line.className = 'step-line' + (i < current ? ' done' : '');
+  }
+}
+
+function updateScoreRing(score) {
+  const circ = 213.6;
+  const offset = circ - (score * circ);
+  const el = document.getElementById('score-circle');
+  el.style.strokeDashoffset = offset;
+  el.style.stroke = score >= .8 ? '#22c55e' : score >= .5 ? '#f59e0b' : '#ef4444';
+  const pct = Math.round(score * 100);
+  const num = document.getElementById('score-num');
+  num.textContent = pct + '%';
+  num.style.color = score >= .8 ? '#22c55e' : score >= .5 ? '#f59e0b' : '#ef4444';
+}
+
+function updateSessionMetrics() {
+  document.getElementById('m-pii').textContent = sessionPii;
+  document.getElementById('m-docs').textContent = sessionDocs;
+  document.getElementById('m-eps').textContent = sessionEps;
+  if (scores.length) {
+    const avg = scores.reduce((a,b) => a+b, 0) / scores.length;
+    document.getElementById('m-score').textContent = (avg*100).toFixed(0) + '%';
+    document.getElementById('m-score').style.color = avg >= .8 ? 'var(--green)' : avg >= .5 ? 'var(--amber)' : 'var(--red)';
+  }
+}
+
+function addAudit(icon, iconClass, title, detail) {
+  const now = new Date().toLocaleTimeString();
+  auditLog.unshift({ icon, iconClass, title, detail, time: now });
+  const log = document.getElementById('audit-log');
+  log.innerHTML = auditLog.slice(0,20).map(e => `
+    <div class="audit-entry">
+      <div class="audit-icon ${e.iconClass}">${e.icon}</div>
+      <div class="audit-body">
+        <div class="audit-title">${e.title}</div>
+        <div class="audit-detail">${e.detail}</div>
+        <div class="audit-time">${e.time}</div>
+      </div>
+    </div>`).join('');
+}
+
+function detectPiiInDoc(text) {
+  const emailRe = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+  const phoneRe = /(\+91[-\s]?)?[6-9]\d{9}|0\d{2,4}[-\s]\d{6,8}/g;
+  const cardRe  = /\b\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b/g;
+  const aadRe   = /\b\d{4}\s\d{4}\s\d{4}\b/g;
+  emailCount = (text.match(emailRe)||[]).length;
+  phoneCount = (text.match(phoneRe)||[]).length;
+  cardCount  = (text.match(cardRe)||[]).length;
+  idCount    = (text.match(aadRe)||[]).length;
+  document.getElementById('l-email').textContent = emailCount;
+  document.getElementById('l-phone').textContent = phoneCount;
+  document.getElementById('l-card').textContent  = cardCount;
+  document.getElementById('l-id').textContent    = idCount;
+  const total = emailCount + phoneCount + cardCount + idCount;
+  document.getElementById('pii-detected-count').textContent = total + ' PII items detected';
+  if (total > 0) {
+    document.getElementById('pii-scan-badge').style.display = '';
+  }
+  return total;
+}
+
+function wordCount(text) {
+  return text.trim() ? text.trim().split(/\s+/).length : 0;
+}
+
+function onRedactedInput() {
+  const text = document.getElementById('redacted-doc').innerText;
+  document.getElementById('redact-wordcount').textContent = wordCount(text) + ' words';
+}
+
+function copyOriginal() {
+  if (!currentDoc) return;
+  document.getElementById('redacted-doc').innerText = currentDoc;
+  document.getElementById('redact-wordcount').textContent = wordCount(currentDoc) + ' words';
+  showToast('Original copied to editor — start redacting!');
+}
+
+function autoRedact() {
+  let text = document.getElementById('redacted-doc').innerText || currentDoc;
+  if (!text) { showToast('Load a document first', 'error'); return; }
+  text = text.replace(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, '[EMAIL]');
+  text = text.replace(/(\+91[-\s]?)?[6-9]\d{9}/g, '[PHONE]');
+  text = text.replace(/0\d{2,4}[-\s]\d{6,8}/g, '[PHONE]');
+  text = text.replace(/\b\d{4}[\s]?\d{4}[\s]?\d{4}\b/g, '[AADHAAR]');
+  text = text.replace(/\b\d{4}[\s\-]\d{4}[\s\-]\d{4}[\s\-]\d{4}\b/g, '[CREDIT_CARD]');
+  document.getElementById('redacted-doc').innerText = text;
+  onRedactedInput();
+  showToast('Auto-tagged pattern PII — review and complete manual redaction');
+}
+
+async function doReset() {
+  setStatus('running', 'Resetting environment...');
+  document.getElementById('submit-btn').disabled = true;
+  document.getElementById('score-num').textContent = '—';
+  document.getElementById('score-circle').style.strokeDashoffset = '213.6';
+  document.getElementById('compliance-badge').textContent = 'Not submitted';
+  document.getElementById('compliance-badge').style.background = 'var(--bg3)';
+  document.getElementById('compliance-badge').style.color = 'var(--text3)';
+  document.getElementById('pii-scan-badge').style.display = 'none';
+  document.getElementById('feedback-area').textContent = 'Submit a redaction to see compliance feedback.';
+  document.getElementById('original-doc').textContent = 'Loading...';
+  document.getElementById('redacted-doc').innerText = '';
+  ['sb-pii','sb-util','sb-cov'].forEach(id => document.getElementById(id).style.width = '0%');
+  ['sv-pii','sv-util','sv-cov'].forEach(id => document.getElementById(id).textContent = '—');
+
+  try {
+    const res  = await fetch('/reset?task_name=' + currentTask, { method: 'POST' });
+    const data = await res.json();
+    const obs  = data.observation;
+    currentDoc = obs.document;
+
+    document.getElementById('original-doc').textContent = obs.document;
+    document.getElementById('orig-wordcount').textContent = wordCount(obs.document) + ' words';
+    document.getElementById('submit-btn').disabled = false;
+
+    const piiCount = detectPiiInDoc(obs.document);
+    updateSteps(obs.step);
+
+    addAudit('▶', 'info', 'Episode started', `Task: ${obs.task_name} | ${piiCount} PII items to redact`);
+    await refreshState();
+    setStatus('running', 'Episode running — ' + obs.task_name.replace(/_/g,' '));
+    sessionEps++;
+    updateSessionMetrics();
+    showToast('Document loaded — begin redaction', 'success');
+  } catch(e) {
+    setStatus('idle', 'Connection error');
+    document.getElementById('original-doc').textContent = 'Error connecting to environment: ' + e.message;
+    addAudit('✕', 'err', 'Connection failed', e.message);
+  }
+}
+
+async function doStep() {
+  const redacted = document.getElementById('redacted-doc').innerText.trim();
+  if (!redacted) { showToast('Enter your redacted document first', 'error'); return; }
+  document.getElementById('submit-btn').disabled = true;
+  setStatus('running', 'Evaluating redaction...');
+
+  try {
+    const res  = await fetch('/step', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ redacted_text: redacted }) });
+    const data = await res.json();
+    const reward   = data.reward;
+    const done     = data.done;
+    const obs      = data.observation;
+    const info     = data.info || {};
+
+    updateScoreRing(reward);
+    scores.push(reward);
+    sessionDocs++;
+
+    const piiRemoved = info.pii_removed || 0;
+    const piiTotal   = info.pii_total   || 1;
+    const utilScore  = info.utility_score ?? info.utility_ratio ?? (reward >= .5 ? .8 : .3);
+    const covScore   = Math.min(1, redacted.length / Math.max(currentDoc.length * .55, 1));
+
+    const piiPct  = Math.round((piiRemoved/piiTotal)*100);
+    const utilPct = Math.round(utilScore*100);
+    const covPct  = Math.min(100, Math.round(covScore*100));
+
+    document.getElementById('sb-pii').style.width  = piiPct  + '%';
+    document.getElementById('sb-util').style.width = utilPct + '%';
+    document.getElementById('sb-cov').style.width  = covPct  + '%';
+    document.getElementById('sv-pii').textContent  = piiPct  + '%';
+    document.getElementById('sv-util').textContent = utilPct + '%';
+    document.getElementById('sv-cov').textContent  = covPct  + '%';
+
+    const badge = document.getElementById('compliance-badge');
+    if (reward >= .8) { badge.textContent = 'Compliant'; badge.style.background='var(--green-dim)'; badge.style.color='var(--green)'; }
+    else if (reward >= .5) { badge.textContent = 'Partial'; badge.style.background='var(--amber-dim)'; badge.style.color='var(--amber)'; }
+    else { badge.textContent = 'Non-Compliant'; badge.style.background='var(--red-dim)'; badge.style.color='var(--red)'; }
+
+    const fb = document.getElementById('feedback-area');
+    fb.textContent = obs.feedback || 'No feedback.';
+    fb.style.color = reward >= .8 ? 'var(--green)' : reward >= .5 ? 'var(--amber)' : 'var(--red)';
+
+    sessionPii += piiRemoved;
+    updateSessionMetrics();
+
+    const icon  = reward >= .8 ? '✓' : reward >= .5 ? '!' : '✕';
+    const icls  = reward >= .8 ? 'ok' : reward >= .5 ? 'warn' : 'err';
+    addAudit(icon, icls, `Step scored ${(reward*100).toFixed(0)}%`, `${piiRemoved}/${piiTotal} PII redacted | ${obs.feedback?.substring(0,60)}...`);
+
+    if (done) {
+      setStatus('idle', 'Episode complete');
+      document.getElementById('original-doc').textContent = '✅ Episode complete! Click "New Episode" to continue.';
+      document.getElementById('redacted-doc').innerText = '';
+      updateSteps(4);
+      showToast(`Episode done! Final score: ${(reward*100).toFixed(0)}%`, reward >= .7 ? 'success' : 'error');
+    } else {
+      currentDoc = obs.document;
+      document.getElementById('original-doc').textContent = obs.document;
+      document.getElementById('orig-wordcount').textContent = wordCount(obs.document) + ' words';
+      document.getElementById('redacted-doc').innerText = '';
+      document.getElementById('pii-scan-badge').style.display = 'none';
+      detectPiiInDoc(obs.document);
+      updateSteps(obs.step);
+      document.getElementById('submit-btn').disabled = false;
+      setStatus('running', 'Next document loaded');
+      showToast(`Step ${obs.step-1} complete — score: ${(reward*100).toFixed(0)}%`);
+    }
+    await refreshState();
+  } catch(e) {
+    addAudit('✕', 'err', 'Step failed', e.message);
+    document.getElementById('submit-btn').disabled = false;
+    setStatus('idle', 'Error');
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+async function refreshState() {
+  try {
+    const data = await (await fetch('/state')).json();
+    document.getElementById('st-task').textContent   = (data.task_name||'—').replace(/_/g,' ');
+    document.getElementById('st-ep').textContent     = (data.episode_id||'—').substring(0,14)+'...';
+    document.getElementById('st-step').textContent   = `${data.step} / ${data.max_steps}`;
+    document.getElementById('st-reward').textContent = (data.total_reward||0).toFixed(2);
+    document.getElementById('st-pii').textContent    = `${data.pii_items_found||0} / ${data.pii_items_total||0}`;
+  } catch(e) { console.error(e); }
+}
+
+refreshState();
+document.getElementById('sb-time').textContent = new Date().toLocaleTimeString();
+</script>
+</body>
+</html>

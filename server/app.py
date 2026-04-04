@@ -6,10 +6,13 @@ Fully compliant with OpenEnv spec.
 """
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from .environment import PrivacyGuardianEnvironment
 from .models import (
@@ -47,6 +50,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve the interactive UI
+from pathlib import Path
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+
+STATIC_DIR = Path(__file__).parent.parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    index = STATIC_DIR / "index.html"
+    if index.exists():
+        return HTMLResponse(content=index.read_text(), status_code=200)
+    return HTMLResponse(content="<h1>Privacy Guardian</h1><a href='/docs'>API Docs</a>")
 
 
 # ── FIX 1: /health must return "healthy" ──────────────────────────────────────
