@@ -294,3 +294,18 @@ async def list_tasks():
             },
         ]
     }
+
+
+def main() -> None:
+    """Run the FastAPI app via Uvicorn."""
+    import subprocess
+    import sys
+
+    subprocess.run(
+        [sys.executable, "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8000"],
+        check=True,
+    )
+
+
+if __name__ == "__main__":
+    main()
