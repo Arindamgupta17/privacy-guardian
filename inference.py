@@ -99,11 +99,9 @@ def get_redacted_text(
         Previous feedback: {feedback or 'None — first attempt.'}
 
         Document to redact:
-        ---
         {document}
-        ---
 
-        Return ONLY the redacted document. No explanation.
+        Return ONLY the redacted document text. No explanation, no dashes, no preamble.
     """).strip()
 
     try:
