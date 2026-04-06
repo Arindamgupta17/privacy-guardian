@@ -156,7 +156,12 @@ async def schema():
                 "pii_categories":   {"type": "array", "items": {"type": "string"}},
                 "step":             {"type": "integer"},
                 "last_reward":      {"type": "number"},
-                "feedback": {"type": ["string", "null"]}
+                "feedback":{
+                            "anyOf":[
+                                        {"type":"string"},
+                                        {"type":"null"}
+                                    ]
+                                }
             },
             "required": ["document", "task_name", "task_description", "pii_categories", "step", "last_reward"],
         },
@@ -171,7 +176,12 @@ async def schema():
                 "total_reward":    {"type": "number"},
                 "pii_items_total": {"type": "integer"},
                 "pii_items_found": {"type": "integer"},
-                "last_action": {"type": ["string", "null"]}
+                "last_action":{
+                                "anyOf":[
+                                        {"type":"string"},
+                                        {"type":"null"}
+                                    ]
+                            }
             },
             "required": ["episode_id", "task_name", "step", "max_steps", "done", "total_reward"],
         },
