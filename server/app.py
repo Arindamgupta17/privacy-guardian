@@ -300,3 +300,7 @@ def main():
         workers=1,
         log_level="info",
     )
+
+
+if __name__ == "__main__":
+    main()
