@@ -1,16 +1,7 @@
 """
 Task 1 — EASY: Pattern PII Redaction
-=====================================
-Documents contain clearly formatted, obvious PII.
-Easy enough that any LLM passes — proving the environment works.
-But reward function still has variance via utility bonus.
-
-PII types: emails, phones (Indian formats), credit cards, Aadhaar numbers.
-Grader: deterministic string matching against planted PII list.
-Exploit guard: blank/tiny redaction = 0.0 score.
+Scores are strictly in (0.05, 0.95) — never exactly 0.0 or 1.0.
 """
-
-import re
 from typing import Dict, List, Tuple
 
 EASY_DOCUMENTS: List[Dict] = [
@@ -24,12 +15,7 @@ EASY_DOCUMENTS: List[Dict] = [
             "for this purchase. My Aadhaar number is 1234 5678 9012. Please resolve this "
             "at the earliest.\n\nRegards,\nAmit"
         ),
-        "pii_items": [
-            "amit.sharma@gmail.com",
-            "9876543210",
-            "4111 1111 1111 1111",
-            "1234 5678 9012",
-        ],
+        "pii_items": ["amit.sharma@gmail.com", "9876543210", "4111 1111 1111 1111", "1234 5678 9012"],
         "utility_keywords": ["order", "billing", "purchase", "support"],
     },
     {
@@ -45,13 +31,7 @@ EASY_DOCUMENTS: List[Dict] = [
             "Aadhaar: 9876 5432 1098\n"
             "Status: Escalated to L2 support."
         ),
-        "pii_items": [
-            "priya.nair@outlook.com",
-            "+91-98765-43210",
-            "080-22334455",
-            "5500 0000 0000 0004",
-            "9876 5432 1098",
-        ],
+        "pii_items": ["priya.nair@outlook.com", "+91-98765-43210", "080-22334455", "5500 0000 0000 0004", "9876 5432 1098"],
         "utility_keywords": ["refund", "escalated", "support", "complaint"],
     },
     {
@@ -65,11 +45,7 @@ EASY_DOCUMENTS: List[Dict] = [
             "Transaction of Rs. 4,500 was made at Amazon.in on 01-Apr-2026.\n"
             "If this was not you, call our helpline immediately."
         ),
-        "pii_items": [
-            "rahul.v@ymail.com",
-            "7654321098",
-            "3782 822463 10005",
-        ],
+        "pii_items": ["rahul.v@ymail.com", "7654321098", "3782 822463 10005"],
         "utility_keywords": ["transaction", "amazon", "banking", "helpline"],
     },
     {
@@ -81,21 +57,16 @@ EASY_DOCUMENTS: List[Dict] = [
             "Name: Sunita Rao\n"
             "Email: sunita.rao@rediffmail.com\n"
             "Mobile: 9988776655\n"
-            "PAN: ABCDE1234F\n"
             "Aadhaar: 2345 6789 0123\n"
             "Please submit your documents within 48 hours to avoid account suspension."
         ),
-        "pii_items": [
-            "sunita.rao@rediffmail.com",
-            "9988776655",
-            "2345 6789 0123",
-        ],
+        "pii_items": ["sunita.rao@rediffmail.com", "9988776655", "2345 6789 0123"],
         "utility_keywords": ["kyc", "account", "verification", "documents"],
     },
     {
         "id": "easy_005",
         "text": (
-            "Insurance Claim Form — Auto-filled\n\n"
+            "Insurance Claim Form\n\n"
             "Claimant: Vikram Singh\n"
             "Policy Email: vikram.singh@insureme.in\n"
             "Contact: 8123456789\n"
@@ -103,18 +74,16 @@ EASY_DOCUMENTS: List[Dict] = [
             "Aadhaar: 5678 9012 3456\n"
             "Claim Type: Health — Hospitalization\n"
             "Amount Claimed: Rs. 1,25,000\n"
-            "Hospital: Apollo Hospital, Chennai\n"
             "Status: Under review."
         ),
-        "pii_items": [
-            "vikram.singh@insureme.in",
-            "8123456789",
-            "4000 0566 5566 5556",
-            "5678 9012 3456",
-        ],
-        "utility_keywords": ["insurance", "claim", "hospitalization", "apollo"],
+        "pii_items": ["vikram.singh@insureme.in", "8123456789", "4000 0566 5566 5556", "5678 9012 3456"],
+        "utility_keywords": ["insurance", "claim", "hospitalization", "health"],
     },
 ]
+
+# Score boundaries — strictly between 0 and 1
+MIN_SCORE = 0.05
+MAX_SCORE = 0.95
 
 
 def get_task_config() -> Dict:
@@ -122,9 +91,9 @@ def get_task_config() -> Dict:
         "name": "pattern_redaction",
         "description": (
             "Redact all clearly formatted PII from the document. "
-            "Replace email addresses with [EMAIL], phone numbers with [PHONE], "
-            "credit/debit card numbers with [CREDIT_CARD], and Aadhaar numbers with [AADHAAR]. "
-            "Preserve all other content exactly — do not remove non-PII text."
+            "Replace emails with [EMAIL], phones with [PHONE], "
+            "card numbers with [CREDIT_CARD], Aadhaar numbers with [AADHAAR]. "
+            "Preserve all other content exactly."
         ),
         "pii_categories": ["EMAIL", "PHONE", "CREDIT_CARD", "AADHAAR"],
         "max_steps": 3,
@@ -132,16 +101,15 @@ def get_task_config() -> Dict:
 
 
 def get_document(step: int) -> Dict:
-    idx = (step - 1) % len(EASY_DOCUMENTS)
-    return EASY_DOCUMENTS[idx]
+    return EASY_DOCUMENTS[(step - 1) % len(EASY_DOCUMENTS)]
 
 
 def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     info = {}
 
-    # Exploit guard
+    # Over-redaction guard — never return exactly 0.0
     if len(redacted.strip()) < 0.30 * len(original):
-        return 0.0, "Over-redaction: document too short. Only replace PII, preserve everything else.", {"exploit": "over_redaction"}
+        return MIN_SCORE, "Over-redaction: document too short. Only replace PII tokens, preserve everything else.", {"exploit": "over_redaction"}
 
     pii_items: List[str] = doc["pii_items"]
     removed, missed = 0, []
@@ -157,15 +125,18 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     keywords_present = sum(1 for kw in utility_keywords if kw.lower() in redacted.lower())
     utility_bonus = 0.1 if keywords_present >= len(utility_keywords) * 0.75 else 0.0
 
-    final_score = min(1.0, round(pii_score * 0.9 + utility_bonus, 4))
+    raw_score = pii_score * 0.9 + utility_bonus
+
+    # Clamp strictly between MIN_SCORE and MAX_SCORE — never 0.0 or 1.0
+    final_score = round(max(MIN_SCORE, min(MAX_SCORE, raw_score)), 4)
 
     feedback_parts = []
     if missed:
-        feedback_parts.append(f"Missed PII items: {missed[:3]}{'...' if len(missed)>3 else ''}")
+        feedback_parts.append(f"Missed PII: {missed[:3]}{'...' if len(missed) > 3 else ''}")
     if utility_bonus == 0.0:
-        feedback_parts.append("Some utility content was removed — preserve non-PII text.")
+        feedback_parts.append("Some utility content removed — preserve non-PII text.")
     if not feedback_parts:
-        feedback_parts.append("Excellent! All PII removed and document utility preserved.")
+        feedback_parts.append("Excellent redaction! All PII removed and document utility preserved.")
 
     info = {
         "pii_total": len(pii_items),
@@ -174,6 +145,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         "utility_keywords_present": keywords_present,
         "pii_score": round(pii_score, 4),
         "utility_bonus": utility_bonus,
+        "final_score": final_score,
     }
 
     return final_score, " | ".join(feedback_parts), info

@@ -1,14 +1,7 @@
 """
 Task 2 — MEDIUM: Contextual NER Redaction
-==========================================
-PII is embedded in natural language — no obvious labels.
-Ground truth list is fixed at dataset creation = fully deterministic.
-Agent must understand language context, not just pattern match.
-
-Scoring: PII removal (80%) + utility preservation (20%)
-Exploit guard: blank/tiny doc = 0.0
+Scores are strictly in (0.05, 0.95) — never exactly 0.0 or 1.0.
 """
-
 from typing import Dict, List, Tuple
 
 MEDIUM_DOCUMENTS: List[Dict] = [
@@ -24,12 +17,7 @@ MEDIUM_DOCUMENTS: List[Dict] = [
             "Customer: I'm his wife. Our neighbour Ramesh also has an account with you.\n"
             "Agent: Noted. Let me pull up Vikram's account right away."
         ),
-        "pii_items": [
-            "Sneha Kulkarni", "Sneha",
-            "Vikram", "Vikram Kulkarni",
-            "Pune", "Kothrud",
-            "Ramesh",
-        ],
+        "pii_items": ["Sneha Kulkarni", "Sneha", "Vikram", "Vikram Kulkarni", "Pune", "Kothrud", "Ramesh"],
         "utility_keywords": ["account", "customer", "support", "registered", "mobile"],
     },
     {
@@ -44,12 +32,7 @@ MEDIUM_DOCUMENTS: List[Dict] = [
             "gave as Mr. Suresh Rao, has also been affected. Deepak said he would escalate "
             "to the consumer forum if not resolved by Friday.\n\nPlease prioritize this ticket."
         ),
-        "pii_items": [
-            "Deepak Menon", "Deepak",
-            "Anjali",
-            "Hyderabad", "Banjara Hills",
-            "Suresh Rao", "Mr. Suresh Rao",
-        ],
+        "pii_items": ["Deepak Menon", "Deepak", "Anjali", "Hyderabad", "Banjara Hills", "Suresh Rao", "Mr. Suresh Rao"],
         "utility_keywords": ["escalation", "complaint", "consumer", "ticket", "prioritize"],
     },
     {
@@ -63,13 +46,7 @@ MEDIUM_DOCUMENTS: List[Dict] = [
             "Hospital under a Dr. Prakash. She currently resides near Adyar, Chennai.\n\n"
             "Diagnosis: Chronic migraine with aura.\nPrescribed: Topiramate 50mg."
         ),
-        "pii_items": [
-            "Dr. Meera Joshi", "Meera Joshi",
-            "Kavitha", "Chennai",
-            "Colonel Srinivas", "Srinivas",
-            "Dr. Prakash", "Prakash",
-            "Adyar",
-        ],
+        "pii_items": ["Dr. Meera Joshi", "Meera Joshi", "Kavitha", "Chennai", "Colonel Srinivas", "Srinivas", "Dr. Prakash", "Prakash", "Adyar"],
         "utility_keywords": ["migraine", "hypertension", "diagnosis", "prescribed", "topiramate"],
     },
     {
@@ -80,16 +57,9 @@ MEDIUM_DOCUMENTS: List[Dict] = [
             "Her referral, Arjun Desai, has applied for the Senior Engineer role. "
             "Arjun previously worked under Rajesh at Infosys Pune. "
             "His reference, a Mr. Venkat from TCS Chennai, spoke highly of his "
-            "problem-solving skills. Arjun currently lives in Whitefield, Bengaluru. "
-            "We should schedule his technical round before end of this month."
+            "problem-solving skills. Arjun currently lives in Whitefield, Bengaluru."
         ),
-        "pii_items": [
-            "Priya Mehta", "Priya",
-            "Arjun Desai", "Arjun",
-            "Rajesh",
-            "Mr. Venkat", "Venkat",
-            "Whitefield", "Bengaluru",
-        ],
+        "pii_items": ["Priya Mehta", "Priya", "Arjun Desai", "Arjun", "Rajesh", "Mr. Venkat", "Venkat", "Whitefield", "Bengaluru"],
         "utility_keywords": ["referral", "engineer", "technical", "infosys", "schedule"],
     },
     {
@@ -100,32 +70,25 @@ MEDIUM_DOCUMENTS: List[Dict] = [
             "evening of the incident, she saw the defendant speaking with a man named "
             "Sunil near the market. She confirmed that her neighbour Krishnamurthy, "
             "who works at the local bank, was also present. The opposing counsel, "
-            "represented by advocate Ramachandran, objected to the line of questioning. "
-            "The judge, presiding officer Shankar, overruled the objection."
+            "represented by advocate Ramachandran, objected to the line of questioning."
         ),
-        "pii_items": [
-            "Mrs. Lalitha Iyer", "Lalitha Iyer", "Lalitha",
-            "Coimbatore",
-            "Sunil",
-            "Krishnamurthy",
-            "Ramachandran",
-            "Shankar",
-        ],
+        "pii_items": ["Mrs. Lalitha Iyer", "Lalitha Iyer", "Lalitha", "Coimbatore", "Sunil", "Krishnamurthy", "Ramachandran"],
         "utility_keywords": ["witness", "testimony", "defendant", "counsel", "objection"],
     },
 ]
+
+MIN_SCORE = 0.05
+MAX_SCORE = 0.95
 
 
 def get_task_config() -> Dict:
     return {
         "name": "contextual_redaction",
         "description": (
-            "Identify and redact PII embedded in natural language. "
-            "Unlike obvious patterns, this PII includes: person names mentioned in conversation, "
-            "city and neighbourhood names tied to individuals, "
-            "and relationship references. "
-            "Replace all personal names with [NAME] and location identifiers with [LOCATION]. "
-            "Preserve the analytical and business content of the document."
+            "Identify and redact PII embedded in natural language — person names, "
+            "city names linked to individuals, and relationship references. "
+            "Replace names with [NAME] and locations with [LOCATION]. "
+            "Preserve all business and analytical content."
         ),
         "pii_categories": ["NAME", "LOCATION", "RELATIONSHIP_REFERENCE"],
         "max_steps": 3,
@@ -133,13 +96,12 @@ def get_task_config() -> Dict:
 
 
 def get_document(step: int) -> Dict:
-    idx = (step - 1) % len(MEDIUM_DOCUMENTS)
-    return MEDIUM_DOCUMENTS[idx]
+    return MEDIUM_DOCUMENTS[(step - 1) % len(MEDIUM_DOCUMENTS)]
 
 
 def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     if len(redacted.strip()) < 0.30 * len(original):
-        return 0.0, "Over-redaction: document too short. Preserve non-PII content.", {"exploit": "over_redaction"}
+        return MIN_SCORE, "Over-redaction: document too short. Preserve non-PII content.", {"exploit": "over_redaction"}
 
     pii_items: List[str] = doc["pii_items"]
     removed, missed = 0, []
@@ -155,13 +117,16 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     keywords_present = sum(1 for kw in utility_keywords if kw.lower() in redacted.lower())
     utility_ratio = keywords_present / len(utility_keywords) if utility_keywords else 1.0
 
-    final_score = min(1.0, round(pii_score * 0.80 + utility_ratio * 0.20, 4))
+    raw_score = pii_score * 0.80 + utility_ratio * 0.20
+
+    # Strictly between MIN_SCORE and MAX_SCORE
+    final_score = round(max(MIN_SCORE, min(MAX_SCORE, raw_score)), 4)
 
     feedback_parts = []
     if missed:
-        feedback_parts.append(f"Contextual PII still present ({len(missed)}): {missed[:3]}{'...' if len(missed)>3 else ''}")
+        feedback_parts.append(f"Contextual PII still present ({len(missed)}): {missed[:3]}{'...' if len(missed) > 3 else ''}")
     if utility_ratio < 0.75:
-        feedback_parts.append("Important business content removed — preserve non-PII context.")
+        feedback_parts.append("Important content removed — preserve non-PII context.")
     if not feedback_parts:
         feedback_parts.append("All contextual PII redacted and document utility preserved!")
 
