@@ -4,7 +4,7 @@ Action, Observation, and State — required by OpenEnv spec.
 """
 
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ─────────────────────────────────────────────
@@ -49,8 +49,8 @@ class RedactionObservation(BaseModel):
     )
     step: int = Field(..., description="Current step number within the episode.")
     last_reward: float = Field(
-        0.0,
-        description="Reward from the previous step. 0.0 at episode start."
+        0.01,
+        description="Reward from the previous step. 0.01 at episode start."
     )
     feedback: Optional[str] = Field(
         None,
@@ -83,9 +83,16 @@ class RedactionState(BaseModel):
 
 class StepResult(BaseModel):
     observation: RedactionObservation
-    reward: float = Field(..., description="Reward for this step, in [0.0, 1.0].")
+    reward: float = Field(..., description="Reward for this step, strictly in (0.01, 0.99).")
     done: bool = Field(..., description="True if the episode is over.")
     info: Dict[str, Any] = Field(default_factory=dict, description="Extra diagnostic info.")
+
+    @field_validator("reward")
+    @classmethod
+    def clamp_reward(cls, v: float) -> float:
+        """Guarantee reward is strictly within (0, 1) — never 0.0 or 1.0."""
+        clamped = max(0.01, min(0.99, float(v)))
+        return round(clamped, 4)
 
 
 # ─────────────────────────────────────────────

@@ -277,7 +277,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     # ── D: Length preservation (10%) ──────────────────────────────────────────
     min_ratio = doc.get("min_length_ratio", 0.50)
     length_ratio = len(redacted.strip()) / max(len(original), 1)
-    length_score = 1.0 if length_ratio >= min_ratio else max(0.0, length_ratio / min_ratio)
+    length_score = 1.0 if length_ratio >= min_ratio else max(0.01, length_ratio / min_ratio)
     info["length_ratio"] = round(length_ratio, 4)
     if length_score < 1.0:
         feedback_parts.append(
