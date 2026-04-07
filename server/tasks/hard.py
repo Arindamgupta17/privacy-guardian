@@ -7,8 +7,6 @@ Genuinely hard for frontier LLMs because:
   3. Over-redaction is penalized — agent cannot blank everything
   4. Forbidden non-PII words must NOT be removed
   5. 4-way weighted scoring means partial failures on each axis
-
-Score is always strictly in (0, 1) — never exactly 0.0 or 1.0.
 """
 
 from typing import Dict, List, Tuple
@@ -209,28 +207,7 @@ def get_document(step: int) -> Dict:
     return HARD_DOCUMENTS[idx]
 
 
-# ── Score bounds — strictly open interval (0, 1) ──────────────────────────────
-MIN_SCORE = 0.01
-MAX_SCORE = 0.99
-
-
-def _strict_score(value: float) -> float:
-    """Clamp to strict open interval — never exactly 0.0 or 1.0."""
-    clamped = max(MIN_SCORE, min(MAX_SCORE, float(value)))
-    rounded = round(clamped, 4)
-    return max(MIN_SCORE, min(MAX_SCORE, rounded))
-
-
 def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
-    """
-    4-way weighted scoring:
-      A. PII removal          (35%)
-      B. Utility keywords     (35%)
-      C. Forbidden removals   (20%)
-      D. Length preservation  (10%)
-
-    Score is always strictly in (MIN_SCORE, MAX_SCORE).
-    """
     feedback_parts = []
     info = {}
     redacted_lower = redacted.lower()
@@ -248,17 +225,15 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     info["pii_total"]   = len(pii_items)
     info["pii_missed"]  = missed
     if missed:
-        feedback_parts.append(
-            f"PII still present ({len(missed)}): {missed[:2]}{'...' if len(missed) > 2 else ''}"
-        )
+        feedback_parts.append(f"PII still present ({len(missed)}): {missed[:2]}{'...' if len(missed)>2 else ''}")
 
     # ── B: Utility keyword preservation (35%) ─────────────────────────────────
     utility_keywords = doc["utility_keywords"]
     found_kw = [kw for kw in utility_keywords if kw.lower() in redacted_lower]
     utility_score = len(found_kw) / len(utility_keywords) if utility_keywords else 1.0
-    info["utility_score"]            = round(utility_score, 4)
-    info["utility_keywords_present"] = len(found_kw)
-    info["utility_keywords_total"]   = len(utility_keywords)
+    info["utility_score"]             = round(utility_score, 4)
+    info["utility_keywords_present"]  = len(found_kw)
+    info["utility_keywords_total"]    = len(utility_keywords)
     if utility_score < 0.75:
         missing_kw = [kw for kw in utility_keywords if kw.lower() not in redacted_lower]
         feedback_parts.append(f"Lost analytical keywords: {missing_kw[:3]} — preserve these.")
@@ -270,28 +245,24 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     info["forbidden_score"] = round(forbidden_score, 4)
     if forbidden_score < 0.80:
         over_redacted = [w for w in forbidden if w.lower() not in redacted_lower]
-        feedback_parts.append(
-            f"Over-redacted non-PII: {over_redacted[:3]} — do not remove these."
-        )
+        feedback_parts.append(f"Over-redacted non-PII: {over_redacted[:3]} — do not remove these.")
 
     # ── D: Length preservation (10%) ──────────────────────────────────────────
     min_ratio = doc.get("min_length_ratio", 0.50)
     length_ratio = len(redacted.strip()) / max(len(original), 1)
-    length_score = 1.0 if length_ratio >= min_ratio else max(0.01, length_ratio / min_ratio)
+    length_score = 1.0 if length_ratio >= min_ratio else max(0.0, length_ratio / min_ratio)
     info["length_ratio"] = round(length_ratio, 4)
     if length_score < 1.0:
-        feedback_parts.append(
-            f"Document too short ({length_ratio:.0%}). Preserve non-PII sentences."
-        )
+        feedback_parts.append(f"Document too short ({length_ratio:.0%}). Preserve non-PII sentences.")
 
-    # ── Final score — always strictly in (MIN_SCORE, MAX_SCORE) ───────────────
-    raw = (
+    # ── Final score ────────────────────────────────────────────────────────────
+    final_score = min(1.0, round(
         pii_score       * 0.35 +
         utility_score   * 0.35 +
         forbidden_score * 0.20 +
-        length_score    * 0.10
-    )
-    final_score = _strict_score(raw)
+        length_score    * 0.10,
+        4
+    ))
     info["final_score"] = final_score
 
     if not feedback_parts:

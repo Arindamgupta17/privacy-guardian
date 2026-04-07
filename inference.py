@@ -17,9 +17,10 @@ Environment variables required:
 import asyncio
 import os
 import textwrap
-from typing import Any, List, Optional
+from typing import List, Optional
 
 import httpx
+from openai import OpenAI
 
 # ── Config ────────────────────────────────────────────────────────────────────
 API_BASE_URL     = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
@@ -27,8 +28,7 @@ MODEL_NAME       = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 HF_TOKEN         = os.getenv("HF_TOKEN")
 API_KEY          = HF_TOKEN or os.getenv("API_KEY")
 ENV_BASE_URL     = os.getenv("ENV_BASE_URL", "http://localhost:7860")
-LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
-IMAGE_NAME       = os.getenv("IMAGE_NAME", LOCAL_IMAGE_NAME or "")
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")   # Docker image name if using from_docker_image()
 
 TASK_NAMES = [
     "pattern_redaction",
@@ -41,19 +41,6 @@ MAX_STEPS               = 3
 TEMPERATURE             = 0.2
 MAX_TOKENS              = 1000
 SUCCESS_SCORE_THRESHOLD = 0.5
-
-# Strict open interval — scores must never be exactly 0.0 or 1.0
-MIN_LOG_SCORE = 0.01
-MAX_LOG_SCORE = 0.99
-
-
-def strict_score(value: float) -> float:
-    """Clamp to strict open interval (0, 1) — never 0.0 or 1.0."""
-    clamped = max(MIN_LOG_SCORE, min(MAX_LOG_SCORE, float(value)))
-    rounded = round(clamped, 4)
-    # Re-clamp after rounding to prevent boundary drift
-    return max(MIN_LOG_SCORE, min(MAX_LOG_SCORE, rounded))
-
 
 SYSTEM_PROMPT = textwrap.dedent("""
     You are an expert Data Privacy Officer specializing in GDPR and HIPAA compliance.
@@ -84,17 +71,15 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
     action_preview = action[:80].replace("\n", " ") if action else ""
     error_val = error if error else "null"
     done_val  = str(done).lower()
-    # Format reward to 4 decimal places to avoid 0.00 display
     print(
         f"[STEP] step={step} action={action_preview!r} "
-        f"reward={reward:.4f} done={done_val} error={error_val}",
+        f"reward={reward:.2f} done={done_val} error={error_val}",
         flush=True,
     )
 
 
 def log_end(success: bool, steps: int, rewards: List[float]) -> None:
-    # Format each reward to 4 decimal places to avoid 0.00 or 1.00
-    rewards_str = ",".join(f"{r:.4f}" for r in rewards)
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
     print(
         f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}",
         flush=True,
@@ -102,8 +87,8 @@ def log_end(success: bool, steps: int, rewards: List[float]) -> None:
 
 
 # ── LLM call ──────────────────────────────────────────────────────────────────
-async def get_redacted_text(
-    client: httpx.AsyncClient,
+def get_redacted_text(
+    client: OpenAI,
     document: str,
     task_description: str,
     pii_categories: List[str],
@@ -121,25 +106,17 @@ async def get_redacted_text(
     """).strip()
 
     try:
-        payload = {
-            "model": MODEL_NAME,
-            "messages": [
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
+                {"role": "user",   "content": user_prompt},
             ],
-            "temperature": TEMPERATURE,
-            "max_tokens": MAX_TOKENS,
-            "stream": False,
-        }
-        response = await client.post(
-            f"{API_BASE_URL.rstrip('/')}/chat/completions",
-            json=payload,
-            headers={"Authorization": f"Bearer {os.environ['API_KEY']}"},
-            timeout=60.0,
+            temperature=TEMPERATURE,
+            max_tokens=MAX_TOKENS,
+            stream=False,
         )
-        response.raise_for_status()
-        completion = response.json()
-        text = (completion["choices"][0]["message"]["content"] or "").strip()
+        text = (completion.choices[0].message.content or "").strip()
         return text if text else document
     except Exception as exc:
         print(f"[DEBUG] Model request failed: {exc}", flush=True)
@@ -186,7 +163,7 @@ async def env_health(http: httpx.AsyncClient) -> bool:
 
 # ── Single task loop ──────────────────────────────────────────────────────────
 async def run_task(
-    client: httpx.AsyncClient,
+    client: OpenAI,
     http: httpx.AsyncClient,
     task_name: str,
 ) -> dict:
@@ -204,7 +181,7 @@ async def run_task(
             if result.get("done", False):
                 break
 
-            redacted = await get_redacted_text(
+            redacted = get_redacted_text(
                 client=client,
                 document=obs["document"],
                 task_description=obs["task_description"],
@@ -213,8 +190,7 @@ async def run_task(
             )
 
             step_result = await env_step(http, redacted)
-            raw_reward = float(step_result.get("reward", MIN_LOG_SCORE))
-            reward = strict_score(raw_reward)
+            reward = float(step_result.get("reward", 0.0))
             done   = step_result.get("done", False)
             error  = None
 
@@ -229,14 +205,15 @@ async def run_task(
             if done:
                 break
 
-        avg = sum(rewards) / len(rewards) if rewards else MIN_LOG_SCORE
+        avg = sum(rewards) / len(rewards) if rewards else 0.0
         success = avg >= SUCCESS_SCORE_THRESHOLD
 
     except Exception as exc:
         print(f"[DEBUG] Task {task_name} error: {exc}", flush=True)
-        rewards = rewards or [MIN_LOG_SCORE]
+        rewards = rewards or [0.0]
 
     finally:
+        # Always close — mirrors env.close() from the dashboard sample script
         try:
             await env_close(http)
         except Exception as e:
@@ -253,8 +230,11 @@ async def main() -> None:
     print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
     print(f"[DEBUG] IMAGE_NAME={IMAGE_NAME}", flush=True)
 
-    async with httpx.AsyncClient(timeout=60.0) as http, httpx.AsyncClient(timeout=60.0) as client:
+    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
+    async with httpx.AsyncClient(timeout=60.0) as http:
+
+        # Wait for environment to be healthy
         print("[DEBUG] Waiting for environment to be ready...", flush=True)
         for attempt in range(15):
             if await env_health(http):
@@ -264,16 +244,18 @@ async def main() -> None:
         else:
             print("[DEBUG] WARNING: Environment health check failed — proceeding anyway", flush=True)
 
+        # Run all 3 tasks sequentially
         all_results = []
         for task_name in TASK_NAMES:
             result = await run_task(client, http, task_name)
             all_results.append(result)
             await asyncio.sleep(1)
 
+        # Summary
         print("\n[DEBUG] ====== SUMMARY ======", flush=True)
         for r in all_results:
-            avg = sum(r["rewards"]) / len(r["rewards"]) if r["rewards"] else MIN_LOG_SCORE
-            print(f"[DEBUG] {r['task']}: avg={avg:.4f} success={r['success']}", flush=True)
+            avg = sum(r["rewards"]) / len(r["rewards"]) if r["rewards"] else 0.0
+            print(f"[DEBUG] {r['task']}: avg={avg:.2f} success={r['success']}", flush=True)
 
 
 if __name__ == "__main__":

@@ -3,14 +3,9 @@ Privacy Guardian — FastAPI Server
 ===================================
 Exposes /reset, /step, /state, /health, /metadata, /schema, /mcp endpoints.
 Fully compliant with OpenEnv spec.
-
-Environment variables:
-  ENV_ENABLE_WEB_INTERFACE=true   Enable the visual dashboard UI (default: true)
 """
 
-import os
 from contextlib import asynccontextmanager
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -27,27 +22,24 @@ from .models import (
     StepResult,
 )
 
-# Config from environment variables
-ENABLE_WEB_UI = os.getenv("ENV_ENABLE_WEB_INTERFACE", "true").lower() == "true"
-STATIC_DIR    = Path(__file__).parent.parent / "static"
-
 # Global environment instance
 env = PrivacyGuardianEnvironment()
-_START_TIME = datetime.utcnow()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print(f"===== Application Startup at {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} =====")
-    print(f"  Web UI enabled: {ENABLE_WEB_UI}")
+    """Initialize environment on startup."""
     env.reset()
-    print("  Environment initialized successfully")
     yield
 
 
 app = FastAPI(
     title="Privacy Guardian — PII Redaction Environment",
-    description="An OpenEnv-compatible RL environment for PII redaction. Set ENV_ENABLE_WEB_INTERFACE=true for the visual dashboard.",
+    description=(
+        "An OpenEnv-compatible RL environment where an AI agent acts as a "
+        "Data Privacy Officer, redacting PII from documents according to "
+        "GDPR/HIPAA compliance rules."
+    ),
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -59,17 +51,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if ENABLE_WEB_UI and STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+# Serve the interactive UI
+from pathlib import Path
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
+STATIC_DIR = Path(__file__).parent.parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    if ENABLE_WEB_UI:
-        index = STATIC_DIR / "index.html"
-        if index.exists():
-            return HTMLResponse(content=index.read_text(), status_code=200)
+    index = STATIC_DIR / "index.html"
+    if index.exists():
+        return HTMLResponse(content=index.read_text(), status_code=200)
     return HTMLResponse(content="<h1>Privacy Guardian</h1><a href='/docs'>API Docs</a>")
+
 
 # ── FIX 1: /health must return "healthy" ──────────────────────────────────────
 @app.get("/health")
@@ -131,7 +128,7 @@ async def metadata():
             {"name": "contextual_redaction",         "difficulty": "medium"},
             {"name": "utility_preserving_redaction", "difficulty": "hard"},
         ],
-        "reward_range": [0.01, 0.99],
+        "reward_range": [0.0, 1.0],
     }
 
 
@@ -159,7 +156,12 @@ async def schema():
                 "pii_categories":   {"type": "array", "items": {"type": "string"}},
                 "step":             {"type": "integer"},
                 "last_reward":      {"type": "number"},
-                "feedback":         {"type": "string"},
+                "feedback":{
+                            "anyOf":[
+                                        {"type":"string"},
+                                        {"type":"null"}
+                                    ]
+                                }
             },
             "required": ["document", "task_name", "task_description", "pii_categories", "step", "last_reward"],
         },
@@ -174,7 +176,12 @@ async def schema():
                 "total_reward":    {"type": "number"},
                 "pii_items_total": {"type": "integer"},
                 "pii_items_found": {"type": "integer"},
-                "last_action":     {"type": "string"},
+                "last_action":{
+                                "anyOf":[
+                                        {"type":"string"},
+                                        {"type":"null"}
+                                    ]
+                            }
             },
             "required": ["episode_id", "task_name", "step", "max_steps", "done", "total_reward"],
         },
@@ -289,16 +296,14 @@ async def list_tasks():
     }
 
 
-# ── Entry point for pyproject.toml [project.scripts] ──────────────────────────
-def main():
-    """Main entry point — used by openenv multi-mode deployment."""
-    import uvicorn
-    uvicorn.run(
-        "server.app:app",
-        host="0.0.0.0",
-        port=7860,
-        workers=1,
-        log_level="info",
+def main() -> None:
+    """Run the FastAPI app via Uvicorn."""
+    import subprocess
+    import sys
+
+    subprocess.run(
+        [sys.executable, "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8000"],
+        check=True,
     )
 
 
