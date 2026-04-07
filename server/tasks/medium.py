@@ -11,7 +11,9 @@ Ground truth PII is defined at dataset creation time (not inferred dynamically).
 This makes the grader fully deterministic.
 
 Grader: Check what % of ground-truth contextual PII tokens are absent from redacted text.
-Exploit protection: redacted < 30% length of original → 0.0
+Exploit protection: redacted < 30% length of original → MIN_SCORE (0.01)
+
+Score is always strictly in (0, 1) — never exactly 0.0 or 1.0.
 """
 
 from typing import Dict, List, Tuple
@@ -92,12 +94,16 @@ MEDIUM_DOCUMENTS: List[Dict] = [
     },
 ]
 
+# ── Score bounds — strictly open interval (0, 1) ──────────────────────────────
 MIN_SCORE = 0.01
 MAX_SCORE = 0.99
 
 
 def _strict_score(value: float) -> float:
-    return max(MIN_SCORE, min(MAX_SCORE, round(float(value), 4)))
+    """Clamp to strict open interval — never exactly 0.0 or 1.0."""
+    clamped = max(MIN_SCORE, min(MAX_SCORE, float(value)))
+    rounded = round(clamped, 4)
+    return max(MIN_SCORE, min(MAX_SCORE, rounded))
 
 
 def get_task_config() -> Dict:
@@ -124,19 +130,24 @@ def get_document(step: int) -> Dict:
 def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     """
     Scoring breakdown:
-      - Over-redaction guard: redacted < 30% of original → 0.0
+      - Over-redaction guard: redacted < 30% of original → MIN_SCORE (0.01)
       - PII removal score (80%): % of ground-truth PII items absent from redacted text
       - Utility preservation (20%): utility keywords still present
+
+    Score is always strictly in (MIN_SCORE, MAX_SCORE) — never exactly 0.0 or 1.0.
     """
     if len(redacted.strip()) < 0.30 * len(original):
-                return MIN_SCORE, "Over-redaction: document too short. Preserve non-PII content.", {"exploit": "over_redaction"}
+        return (
+            MIN_SCORE,
+            "Over-redaction: document too short. Preserve non-PII content.",
+            {"exploit": "over_redaction"},
+        )
 
     pii_items: List[str] = doc["pii_items"]
     removed = 0
     missed = []
 
     for item in pii_items:
-        # Check for exact string absence (case-insensitive)
         if item.lower() not in redacted.lower():
             removed += 1
         else:
@@ -149,11 +160,14 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     keywords_present = sum(1 for kw in utility_keywords if kw.lower() in redacted.lower())
     utility_ratio = keywords_present / len(utility_keywords) if utility_keywords else 1.0
 
-    final_score = _strict_score(pii_score * 0.80 + utility_ratio * 0.20)
+    raw = pii_score * 0.80 + utility_ratio * 0.20
+    final_score = _strict_score(raw)
 
     feedback_parts = []
     if missed:
-        feedback_parts.append(f"Contextual PII still present: {missed[:3]}{'...' if len(missed) > 3 else ''}")
+        feedback_parts.append(
+            f"Contextual PII still present: {missed[:3]}{'...' if len(missed) > 3 else ''}"
+        )
     if utility_ratio < 0.75:
         feedback_parts.append("Important non-PII content was removed — preserve business context.")
     if not feedback_parts:

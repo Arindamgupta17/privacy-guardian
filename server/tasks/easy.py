@@ -8,15 +8,13 @@ Documents contain clearly formatted, obvious PII:
   - Aadhaar numbers (Indian national ID)
 
 Grader: Check what % of planted PII tokens are gone from the redacted text.
-Exploit protection: If redacted text is < 30% length of original → score 0.0
+Exploit protection: If redacted text is < 30% length of original → score 0.01 (MIN)
 """
 
 import re
 from typing import Dict, List, Tuple
 
 # ── Synthetic documents with planted PII ──────────────────────────────────────
-# Each document has a ground-truth list of PII strings that MUST be redacted.
-
 EASY_DOCUMENTS: List[Dict] = [
     {
         "id": "easy_001",
@@ -78,13 +76,16 @@ EASY_DOCUMENTS: List[Dict] = [
     },
 ]
 
-# ── Score bounds ──────────────────────────────────────────────────────────────
+# ── Score bounds — strictly open interval (0, 1) ──────────────────────────────
 MIN_SCORE = 0.01
 MAX_SCORE = 0.99
 
 
 def _strict_score(value: float) -> float:
-    return max(MIN_SCORE, min(MAX_SCORE, round(float(value), 4)))
+    """Clamp to strict open interval — never exactly 0.0 or 1.0."""
+    clamped = max(MIN_SCORE, min(MAX_SCORE, float(value)))
+    rounded = round(clamped, 4)
+    return max(MIN_SCORE, min(MAX_SCORE, rounded))
 
 
 # ── Regex patterns for common PII ─────────────────────────────────────────────
@@ -119,15 +120,21 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     Returns (score, feedback, info_dict).
 
     Scoring breakdown:
-      - Over-redaction guard: if redacted < 30% length of original → 0.0
+      - Over-redaction guard: if redacted < 30% length of original → MIN_SCORE
       - Base score: % of planted PII items successfully removed
       - Utility bonus: +0.1 if key utility keywords are still present
+
+    Score is always strictly in (MIN_SCORE, MAX_SCORE) — never exactly 0 or 1.
     """
     info = {}
 
     # ── Exploit guard ─────────────────────────────────────────────────────────
     if len(redacted.strip()) < 0.30 * len(original):
-        return MIN_SCORE, "Over-redaction detected: the document is too short. Do not blank the entire document.", {"exploit": "over_redaction"}
+        return (
+            MIN_SCORE,
+            "Over-redaction detected: the document is too short. Do not blank the entire document.",
+            {"exploit": "over_redaction"},
+        )
 
     pii_items: List[str] = doc["pii_items"]
     removed = 0
@@ -146,7 +153,9 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     keywords_present = sum(1 for kw in utility_keywords if kw.lower() in redacted.lower())
     utility_bonus = 0.1 if keywords_present >= len(utility_keywords) * 0.75 else 0.0
 
-    final_score = _strict_score(pii_score * 0.9 + utility_bonus)
+    # Compute raw score and clamp strictly to (MIN_SCORE, MAX_SCORE)
+    raw = pii_score * 0.9 + utility_bonus
+    final_score = _strict_score(raw)
 
     feedback_parts = []
     if missed:
