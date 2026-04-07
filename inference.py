@@ -15,7 +15,6 @@ Environment variables required:
 """
 
 import asyncio
-import importlib
 import os
 import textwrap
 from typing import Any, List, Optional
@@ -63,43 +62,6 @@ SYSTEM_PROMPT = textwrap.dedent("""
 """).strip()
 
 
-class _FallbackMessage:
-    content = None
-
-
-class _FallbackChoice:
-    message = _FallbackMessage()
-
-
-class _FallbackCompletion:
-    choices = [_FallbackChoice()]
-
-
-class _FallbackCompletions:
-    @staticmethod
-    def create(*args, **kwargs):
-        return _FallbackCompletion()
-
-
-class _FallbackChat:
-    completions = _FallbackCompletions()
-
-
-class _FallbackOpenAIClient:
-    chat = _FallbackChat()
-
-
-def create_client() -> object:
-    """Create an OpenAI client when available; otherwise use a safe fallback."""
-    try:
-        openai_module = importlib.import_module("openai")
-        openai_client_class = getattr(openai_module, "OpenAI")
-        return openai_client_class(base_url=API_BASE_URL, api_key=API_KEY)
-    except Exception:
-        print("[DEBUG] openai package unavailable; using fallback client", flush=True)
-        return _FallbackOpenAIClient()
-
-
 # ── Logging — strict format required by OpenEnv spec ──────────────────────────
 def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
@@ -125,8 +87,8 @@ def log_end(success: bool, steps: int, rewards: List[float]) -> None:
 
 
 # ── LLM call ──────────────────────────────────────────────────────────────────
-def get_redacted_text(
-    client: Any,
+async def get_redacted_text(
+    client: httpx.AsyncClient,
     document: str,
     task_description: str,
     pii_categories: List[str],
@@ -144,17 +106,25 @@ def get_redacted_text(
     """).strip()
 
     try:
-        completion = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
+        payload = {
+            "model": MODEL_NAME,
+            "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user",   "content": user_prompt},
+                {"role": "user", "content": user_prompt},
             ],
-            temperature=TEMPERATURE,
-            max_tokens=MAX_TOKENS,
-            stream=False,
+            "temperature": TEMPERATURE,
+            "max_tokens": MAX_TOKENS,
+            "stream": False,
+        }
+        response = await client.post(
+            f"{API_BASE_URL.rstrip('/')}/chat/completions",
+            json=payload,
+            headers={"Authorization": f"Bearer {os.environ['API_KEY']}"},
+            timeout=60.0,
         )
-        text = (completion.choices[0].message.content or "").strip()
+        response.raise_for_status()
+        completion = response.json()
+        text = (completion["choices"][0]["message"]["content"] or "").strip()
         return text if text else document
     except Exception as exc:
         print(f"[DEBUG] Model request failed: {exc}", flush=True)
@@ -201,7 +171,7 @@ async def env_health(http: httpx.AsyncClient) -> bool:
 
 # ── Single task loop ──────────────────────────────────────────────────────────
 async def run_task(
-    client: Any,
+    client: httpx.AsyncClient,
     http: httpx.AsyncClient,
     task_name: str,
 ) -> dict:
@@ -219,7 +189,7 @@ async def run_task(
             if result.get("done", False):
                 break
 
-            redacted = get_redacted_text(
+            redacted = await get_redacted_text(
                 client=client,
                 document=obs["document"],
                 task_description=obs["task_description"],
@@ -268,9 +238,7 @@ async def main() -> None:
     print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
     print(f"[DEBUG] IMAGE_NAME={IMAGE_NAME}", flush=True)
 
-    client = create_client()
-
-    async with httpx.AsyncClient(timeout=60.0) as http:
+    async with httpx.AsyncClient(timeout=60.0) as http, httpx.AsyncClient(timeout=60.0) as client:
 
         # Wait for environment to be healthy
         print("[DEBUG] Waiting for environment to be ready...", flush=True)
