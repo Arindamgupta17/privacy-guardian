@@ -6,12 +6,12 @@ MANDATORY FORMAT — do not deviate:
   [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
   [END]   success=<true|false> steps=<n> rewards=<r1,r2,...,rn>
 
-Environment variables required:
-  API_BASE_URL   The API endpoint for the LLM
-  MODEL_NAME     The model identifier to use for inference
-  HF_TOKEN       Your Hugging Face / API key
-  IMAGE_NAME     Docker image name (if using from_docker_image())
-  ENV_BASE_URL   Environment base URL (default: http://localhost:7860)
+Environment variables:
+  API_BASE_URL      The API endpoint for the LLM
+  MODEL_NAME        The model identifier to use for inference
+  HF_TOKEN          Your Hugging Face / API key (no default — must be set)
+  LOCAL_IMAGE_NAME  Docker image name if using from_docker_image()
+  ENV_BASE_URL      Environment base URL (default: http://localhost:7860)
 """
 
 import asyncio
@@ -22,13 +22,13 @@ from typing import List, Optional
 import httpx
 from openai import OpenAI
 
-# ── Config ────────────────────────────────────────────────────────────────────
+# ── Config — exactly as required by hackathon dashboard ───────────────────────
 API_BASE_URL     = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME       = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN         = os.getenv("HF_TOKEN")
+HF_TOKEN         = os.getenv("HF_TOKEN")           # No default — must be set explicitly
 API_KEY          = HF_TOKEN or os.getenv("API_KEY")
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")   # Optional — if using from_docker_image()
 ENV_BASE_URL     = os.getenv("ENV_BASE_URL", "http://localhost:7860")
-LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")   # Docker image name if using from_docker_image()
 
 TASK_NAMES = [
     "pattern_redaction",
@@ -55,6 +55,7 @@ SYSTEM_PROMPT = textwrap.dedent("""
        - Aadhaar / national IDs -> [AADHAAR]
        - Physical addresses     -> [ADDRESS]
        - Other IDs (PAN, EmpID) -> [ID]
+       - Date of birth          -> [DOB]
     2. Preserve ALL non-PII content — medical terms, financial figures,
        business context, and analytical information must remain intact.
     3. Return ONLY the redacted document text. No explanation, no preamble.
@@ -102,7 +103,7 @@ def get_redacted_text(
         Document to redact:
         {document}
 
-        Return ONLY the redacted document text. No explanation, no dashes, no preamble.
+        Return ONLY the redacted document text. No explanation, no preamble.
     """).strip()
 
     try:
@@ -145,7 +146,7 @@ async def env_step(http: httpx.AsyncClient, redacted_text: str) -> dict:
 
 
 async def env_close(http: httpx.AsyncClient) -> None:
-    """Called after every episode — mirrors env.close() in the OpenEnv pattern."""
+    """Called after every episode — mirrors env.close() from OpenEnv pattern."""
     try:
         await http.post(f"{ENV_BASE_URL}/reset", timeout=10.0)
         print("[DEBUG] env.close() — environment reset for cleanup", flush=True)
@@ -213,7 +214,6 @@ async def run_task(
         rewards = rewards or [0.0]
 
     finally:
-        # Always close — mirrors env.close() from the dashboard sample script
         try:
             await env_close(http)
         except Exception as e:
@@ -228,7 +228,7 @@ async def main() -> None:
     print(f"[DEBUG] ENV_BASE_URL={ENV_BASE_URL}", flush=True)
     print(f"[DEBUG] API_BASE_URL={API_BASE_URL}", flush=True)
     print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
-    print(f"[DEBUG] IMAGE_NAME={IMAGE_NAME}", flush=True)
+    print(f"[DEBUG] LOCAL_IMAGE_NAME={LOCAL_IMAGE_NAME}", flush=True)
 
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 

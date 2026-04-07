@@ -1,17 +1,12 @@
 """
-Task 2 — MEDIUM: Contextual PII Redaction
+Task 2 — MEDIUM: Contextual NER Redaction
 ==========================================
-PII is embedded in natural language without obvious formatting.
-Examples:
-  - "I spoke with Sarah from Delhi about her account"
-  - "My brother Raj handles all billing queries"
-  - "The patient's son, Arjun, can be contacted"
+PII is embedded in natural language — no obvious labels.
+Ground truth list is fixed at dataset creation = fully deterministic.
+Agent must understand language context, not just pattern match.
 
-Ground truth PII is defined at dataset creation time (not inferred dynamically).
-This makes the grader fully deterministic.
-
-Grader: Check what % of ground-truth contextual PII tokens are absent from redacted text.
-Exploit protection: redacted < 30% length of original → 0.0
+Scoring: PII removal (80%) + utility preservation (20%)
+Exploit guard: blank/tiny doc = 0.0
 """
 
 from typing import Dict, List, Tuple
@@ -30,12 +25,9 @@ MEDIUM_DOCUMENTS: List[Dict] = [
             "Agent: Noted. Let me pull up Vikram's account right away."
         ),
         "pii_items": [
-            "Sneha Kulkarni",
-            "Sneha",
-            "Vikram",
-            "Vikram Kulkarni",
-            "Pune",
-            "Kothrud",
+            "Sneha Kulkarni", "Sneha",
+            "Vikram", "Vikram Kulkarni",
+            "Pune", "Kothrud",
             "Ramesh",
         ],
         "utility_keywords": ["account", "customer", "support", "registered", "mobile"],
@@ -44,24 +36,19 @@ MEDIUM_DOCUMENTS: List[Dict] = [
         "id": "medium_002",
         "text": (
             "Email thread — Internal Escalation\n\n"
-            "From: Support Agent\n"
-            "Subject: Escalation for unhappy customer\n\n"
+            "From: Support Agent\nSubject: Escalation for unhappy customer\n\n"
             "Hi Team,\n\n"
             "I spoke with Deepak Menon today regarding his complaint. He mentioned that his "
             "colleague Anjali had the same problem last month. Deepak is based out of "
             "Hyderabad and works at a firm near Banjara Hills. His manager, whose name he "
             "gave as Mr. Suresh Rao, has also been affected. Deepak said he would escalate "
-            "to the consumer forum if not resolved by Friday.\n\n"
-            "Please prioritize this ticket.\n\nRegards"
+            "to the consumer forum if not resolved by Friday.\n\nPlease prioritize this ticket."
         ),
         "pii_items": [
-            "Deepak Menon",
-            "Deepak",
+            "Deepak Menon", "Deepak",
             "Anjali",
-            "Hyderabad",
-            "Banjara Hills",
-            "Suresh Rao",
-            "Mr. Suresh Rao",
+            "Hyderabad", "Banjara Hills",
+            "Suresh Rao", "Mr. Suresh Rao",
         ],
         "utility_keywords": ["escalation", "complaint", "consumer", "ticket", "prioritize"],
     },
@@ -74,21 +61,57 @@ MEDIUM_DOCUMENTS: List[Dict] = [
             "in Chennai. Her father, retired Colonel Srinivas, also has a history of "
             "hypertension. The patient mentioned she was previously treated at Apollo "
             "Hospital under a Dr. Prakash. She currently resides near Adyar, Chennai.\n\n"
-            "Diagnosis: Chronic migraine with aura.\n"
-            "Prescribed: Topiramate 50mg."
+            "Diagnosis: Chronic migraine with aura.\nPrescribed: Topiramate 50mg."
         ),
         "pii_items": [
-            "Dr. Meera Joshi",
-            "Meera Joshi",
-            "Kavitha",
-            "Chennai",
-            "Colonel Srinivas",
-            "Srinivas",
-            "Dr. Prakash",
-            "Prakash",
+            "Dr. Meera Joshi", "Meera Joshi",
+            "Kavitha", "Chennai",
+            "Colonel Srinivas", "Srinivas",
+            "Dr. Prakash", "Prakash",
             "Adyar",
         ],
         "utility_keywords": ["migraine", "hypertension", "diagnosis", "prescribed", "topiramate"],
+    },
+    {
+        "id": "medium_004",
+        "text": (
+            "HR Referral Note — Confidential\n\n"
+            "Following up on the referral from Priya Mehta in the sales team. "
+            "Her referral, Arjun Desai, has applied for the Senior Engineer role. "
+            "Arjun previously worked under Rajesh at Infosys Pune. "
+            "His reference, a Mr. Venkat from TCS Chennai, spoke highly of his "
+            "problem-solving skills. Arjun currently lives in Whitefield, Bengaluru. "
+            "We should schedule his technical round before end of this month."
+        ),
+        "pii_items": [
+            "Priya Mehta", "Priya",
+            "Arjun Desai", "Arjun",
+            "Rajesh",
+            "Mr. Venkat", "Venkat",
+            "Whitefield", "Bengaluru",
+        ],
+        "utility_keywords": ["referral", "engineer", "technical", "infosys", "schedule"],
+    },
+    {
+        "id": "medium_005",
+        "text": (
+            "Legal Deposition Summary\n\n"
+            "The witness, a Mrs. Lalitha Iyer from Coimbatore, testified that on the "
+            "evening of the incident, she saw the defendant speaking with a man named "
+            "Sunil near the market. She confirmed that her neighbour Krishnamurthy, "
+            "who works at the local bank, was also present. The opposing counsel, "
+            "represented by advocate Ramachandran, objected to the line of questioning. "
+            "The judge, presiding officer Shankar, overruled the objection."
+        ),
+        "pii_items": [
+            "Mrs. Lalitha Iyer", "Lalitha Iyer", "Lalitha",
+            "Coimbatore",
+            "Sunil",
+            "Krishnamurthy",
+            "Ramachandran",
+            "Shankar",
+        ],
+        "utility_keywords": ["witness", "testimony", "defendant", "counsel", "objection"],
     },
 ]
 
@@ -97,12 +120,12 @@ def get_task_config() -> Dict:
     return {
         "name": "contextual_redaction",
         "description": (
-            "Identify and redact PII that is embedded in natural language. "
-            "Unlike obvious patterns (emails, phone numbers), this PII includes: "
-            "person names mentioned in conversation, city/neighbourhood names tied "
-            "to individuals, relationship references ('his wife', 'her sister'). "
-            "Replace all personal names and location identifiers with [NAME] or [LOCATION]. "
-            "Preserve the analytical/business content of the document."
+            "Identify and redact PII embedded in natural language. "
+            "Unlike obvious patterns, this PII includes: person names mentioned in conversation, "
+            "city and neighbourhood names tied to individuals, "
+            "and relationship references. "
+            "Replace all personal names with [NAME] and location identifiers with [LOCATION]. "
+            "Preserve the analytical and business content of the document."
         ),
         "pii_categories": ["NAME", "LOCATION", "RELATIONSHIP_REFERENCE"],
         "max_steps": 3,
@@ -115,21 +138,12 @@ def get_document(step: int) -> Dict:
 
 
 def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
-    """
-    Scoring breakdown:
-      - Over-redaction guard: redacted < 30% of original → 0.0
-      - PII removal score (80%): % of ground-truth PII items absent from redacted text
-      - Utility preservation (20%): utility keywords still present
-    """
     if len(redacted.strip()) < 0.30 * len(original):
         return 0.0, "Over-redaction: document too short. Preserve non-PII content.", {"exploit": "over_redaction"}
 
     pii_items: List[str] = doc["pii_items"]
-    removed = 0
-    missed = []
-
+    removed, missed = 0, []
     for item in pii_items:
-        # Check for exact string absence (case-insensitive)
         if item.lower() not in redacted.lower():
             removed += 1
         else:
@@ -137,7 +151,6 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
 
     pii_score = removed / len(pii_items) if pii_items else 1.0
 
-    # Utility keywords check
     utility_keywords = doc.get("utility_keywords", [])
     keywords_present = sum(1 for kw in utility_keywords if kw.lower() in redacted.lower())
     utility_ratio = keywords_present / len(utility_keywords) if utility_keywords else 1.0
@@ -146,11 +159,11 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
 
     feedback_parts = []
     if missed:
-        feedback_parts.append(f"Contextual PII still present: {missed[:3]}{'...' if len(missed) > 3 else ''}")
+        feedback_parts.append(f"Contextual PII still present ({len(missed)}): {missed[:3]}{'...' if len(missed)>3 else ''}")
     if utility_ratio < 0.75:
-        feedback_parts.append("Important non-PII content was removed — preserve business context.")
+        feedback_parts.append("Important business content removed — preserve non-PII context.")
     if not feedback_parts:
-        feedback_parts.append("All contextual PII redacted and document utility preserved. Well done!")
+        feedback_parts.append("All contextual PII redacted and document utility preserved!")
 
     info = {
         "pii_total": len(pii_items),

@@ -1,21 +1,17 @@
 """
 Task 1 — EASY: Pattern PII Redaction
 =====================================
-Documents contain clearly formatted, obvious PII:
-  - Email addresses
-  - Phone numbers (Indian + international formats)
-  - Credit card numbers
-  - Aadhaar numbers (Indian national ID)
+Documents contain clearly formatted, obvious PII.
+Easy enough that any LLM passes — proving the environment works.
+But reward function still has variance via utility bonus.
 
-Grader: Check what % of planted PII tokens are gone from the redacted text.
-Exploit protection: If redacted text is < 30% length of original → score 0.0
+PII types: emails, phones (Indian formats), credit cards, Aadhaar numbers.
+Grader: deterministic string matching against planted PII list.
+Exploit guard: blank/tiny redaction = 0.0 score.
 """
 
 import re
 from typing import Dict, List, Tuple
-
-# ── Synthetic documents with planted PII ──────────────────────────────────────
-# Each document has a ground-truth list of PII strings that MUST be redacted.
 
 EASY_DOCUMENTS: List[Dict] = [
     {
@@ -76,13 +72,49 @@ EASY_DOCUMENTS: List[Dict] = [
         ],
         "utility_keywords": ["transaction", "amazon", "banking", "helpline"],
     },
+    {
+        "id": "easy_004",
+        "text": (
+            "KYC Verification Request\n\n"
+            "Dear Customer,\n"
+            "We need to verify your KYC details for account activation.\n"
+            "Name: Sunita Rao\n"
+            "Email: sunita.rao@rediffmail.com\n"
+            "Mobile: 9988776655\n"
+            "PAN: ABCDE1234F\n"
+            "Aadhaar: 2345 6789 0123\n"
+            "Please submit your documents within 48 hours to avoid account suspension."
+        ),
+        "pii_items": [
+            "sunita.rao@rediffmail.com",
+            "9988776655",
+            "2345 6789 0123",
+        ],
+        "utility_keywords": ["kyc", "account", "verification", "documents"],
+    },
+    {
+        "id": "easy_005",
+        "text": (
+            "Insurance Claim Form — Auto-filled\n\n"
+            "Claimant: Vikram Singh\n"
+            "Policy Email: vikram.singh@insureme.in\n"
+            "Contact: 8123456789\n"
+            "Card on file: 4000 0566 5566 5556\n"
+            "Aadhaar: 5678 9012 3456\n"
+            "Claim Type: Health — Hospitalization\n"
+            "Amount Claimed: Rs. 1,25,000\n"
+            "Hospital: Apollo Hospital, Chennai\n"
+            "Status: Under review."
+        ),
+        "pii_items": [
+            "vikram.singh@insureme.in",
+            "8123456789",
+            "4000 0566 5566 5556",
+            "5678 9012 3456",
+        ],
+        "utility_keywords": ["insurance", "claim", "hospitalization", "apollo"],
+    },
 ]
-
-# ── Regex patterns for common PII ─────────────────────────────────────────────
-EMAIL_RE    = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
-PHONE_RE    = re.compile(r"(\+91[-\s]?)?[6-9]\d{9}|0\d{2,4}[-\s]\d{6,8}")
-CARD_RE     = re.compile(r"\b(?:\d[ \-]?){13,16}\b")
-AADHAAR_RE  = re.compile(r"\b\d{4}\s\d{4}\s\d{4}\b")
 
 
 def get_task_config() -> Dict:
@@ -90,10 +122,9 @@ def get_task_config() -> Dict:
         "name": "pattern_redaction",
         "description": (
             "Redact all clearly formatted PII from the document. "
-            "This includes email addresses, phone numbers (Indian formats), "
-            "credit/debit card numbers, and Aadhaar numbers. "
-            "Replace each PII item with an appropriate tag like [EMAIL], [PHONE], "
-            "[CREDIT_CARD], or [AADHAAR]. Preserve all other content exactly."
+            "Replace email addresses with [EMAIL], phone numbers with [PHONE], "
+            "credit/debit card numbers with [CREDIT_CARD], and Aadhaar numbers with [AADHAAR]. "
+            "Preserve all other content exactly — do not remove non-PII text."
         ),
         "pii_categories": ["EMAIL", "PHONE", "CREDIT_CARD", "AADHAAR"],
         "max_steps": 3,
@@ -106,24 +137,14 @@ def get_document(step: int) -> Dict:
 
 
 def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
-    """
-    Returns (score, feedback, info_dict).
-
-    Scoring breakdown:
-      - Over-redaction guard: if redacted < 30% length of original → 0.0
-      - Base score: % of planted PII items successfully removed
-      - Utility bonus: +0.1 if key utility keywords are still present
-    """
     info = {}
 
-    # ── Exploit guard ─────────────────────────────────────────────────────────
+    # Exploit guard
     if len(redacted.strip()) < 0.30 * len(original):
-        return 0.0, "Over-redaction detected: the document is too short. Do not blank the entire document.", {"exploit": "over_redaction"}
+        return 0.0, "Over-redaction: document too short. Only replace PII, preserve everything else.", {"exploit": "over_redaction"}
 
     pii_items: List[str] = doc["pii_items"]
-    removed = 0
-    missed = []
-
+    removed, missed = 0, []
     for item in pii_items:
         if item.lower() not in redacted.lower():
             removed += 1
@@ -132,7 +153,6 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
 
     pii_score = removed / len(pii_items) if pii_items else 1.0
 
-    # ── Utility keyword check ─────────────────────────────────────────────────
     utility_keywords = doc.get("utility_keywords", [])
     keywords_present = sum(1 for kw in utility_keywords if kw.lower() in redacted.lower())
     utility_bonus = 0.1 if keywords_present >= len(utility_keywords) * 0.75 else 0.0
@@ -141,11 +161,11 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
 
     feedback_parts = []
     if missed:
-        feedback_parts.append(f"Missed PII: {missed}")
+        feedback_parts.append(f"Missed PII items: {missed[:3]}{'...' if len(missed)>3 else ''}")
     if utility_bonus == 0.0:
-        feedback_parts.append("Some utility keywords were removed — preserve non-PII content.")
+        feedback_parts.append("Some utility content was removed — preserve non-PII text.")
     if not feedback_parts:
-        feedback_parts.append("Excellent redaction! All PII removed and document utility preserved.")
+        feedback_parts.append("Excellent! All PII removed and document utility preserved.")
 
     info = {
         "pii_total": len(pii_items),

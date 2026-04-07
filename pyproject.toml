@@ -2,7 +2,17 @@
 name = "privacy-guardian-env"
 version = "1.0.0"
 description = "Enterprise PII Redaction RL Environment — OpenEnv Compatible"
+readme = "README.md"
 requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Arindam170304"}
+]
+keywords = ["openenv", "rl", "pii", "gdpr", "privacy", "compliance"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+]
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.30.6",
@@ -10,11 +20,14 @@ dependencies = [
     "python-multipart>=0.0.9",
     "httpx>=0.27.0",
     "openai>=1.0.0",
-    "openenv-core>=0.2.0",
 ]
 
-[project.scripts]
-server = "server.app:main"
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.27.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -22,3 +35,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["server"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.23.0",
+]
