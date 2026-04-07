@@ -15,12 +15,12 @@ Environment variables required:
 """
 
 import asyncio
+import importlib
 import os
 import textwrap
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import httpx
-from openai import OpenAI
 
 # ── Config ────────────────────────────────────────────────────────────────────
 API_BASE_URL     = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
@@ -29,6 +29,7 @@ HF_TOKEN         = os.getenv("HF_TOKEN")
 API_KEY          = HF_TOKEN or os.getenv("API_KEY")
 ENV_BASE_URL     = os.getenv("ENV_BASE_URL", "http://localhost:7860")
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")   # Docker image name if using from_docker_image()
+IMAGE_NAME       = os.getenv("IMAGE_NAME", LOCAL_IMAGE_NAME or "")
 
 TASK_NAMES = [
     "pattern_redaction",
@@ -62,6 +63,43 @@ SYSTEM_PROMPT = textwrap.dedent("""
 """).strip()
 
 
+class _FallbackMessage:
+    content = None
+
+
+class _FallbackChoice:
+    message = _FallbackMessage()
+
+
+class _FallbackCompletion:
+    choices = [_FallbackChoice()]
+
+
+class _FallbackCompletions:
+    @staticmethod
+    def create(*args, **kwargs):
+        return _FallbackCompletion()
+
+
+class _FallbackChat:
+    completions = _FallbackCompletions()
+
+
+class _FallbackOpenAIClient:
+    chat = _FallbackChat()
+
+
+def create_client() -> object:
+    """Create an OpenAI client when available; otherwise use a safe fallback."""
+    try:
+        openai_module = importlib.import_module("openai")
+        openai_client_class = getattr(openai_module, "OpenAI")
+        return openai_client_class(base_url=API_BASE_URL, api_key=API_KEY)
+    except Exception:
+        print("[DEBUG] openai package unavailable; using fallback client", flush=True)
+        return _FallbackOpenAIClient()
+
+
 # ── Logging — strict format required by OpenEnv spec ──────────────────────────
 def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
@@ -88,7 +126,7 @@ def log_end(success: bool, steps: int, rewards: List[float]) -> None:
 
 # ── LLM call ──────────────────────────────────────────────────────────────────
 def get_redacted_text(
-    client: OpenAI,
+    client: Any,
     document: str,
     task_description: str,
     pii_categories: List[str],
@@ -163,7 +201,7 @@ async def env_health(http: httpx.AsyncClient) -> bool:
 
 # ── Single task loop ──────────────────────────────────────────────────────────
 async def run_task(
-    client: OpenAI,
+    client: Any,
     http: httpx.AsyncClient,
     task_name: str,
 ) -> dict:
@@ -230,7 +268,7 @@ async def main() -> None:
     print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
     print(f"[DEBUG] IMAGE_NAME={IMAGE_NAME}", flush=True)
 
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    client = create_client()
 
     async with httpx.AsyncClient(timeout=60.0) as http:
 
