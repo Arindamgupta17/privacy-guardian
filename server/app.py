@@ -131,7 +131,7 @@ async def metadata():
             {"name": "contextual_redaction",         "difficulty": "medium"},
             {"name": "utility_preserving_redaction", "difficulty": "hard"},
         ],
-        "reward_range": [0.0, 1.0],
+        "reward_range": [0.0001, 0.9999],
     }
 
 

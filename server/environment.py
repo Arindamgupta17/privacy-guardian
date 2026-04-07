@@ -21,6 +21,16 @@ from .tasks import TASK_MAP
 
 # Task order for sequential episode flow
 TASK_ORDER = ["pattern_redaction", "contextual_redaction", "utility_preserving_redaction"]
+STRICT_MIN_REWARD = 0.0001
+STRICT_MAX_REWARD = 0.9999
+
+
+def _clamp_strict_score(value: float) -> float:
+    """Clamp a score to the strict open interval (0, 1), rounded to 4 decimals."""
+    clamped = max(STRICT_MIN_REWARD, min(STRICT_MAX_REWARD, float(value)))
+    # Re-apply clamp after rounding to avoid boundary drift.
+    rounded = round(clamped, 4)
+    return max(STRICT_MIN_REWARD, min(STRICT_MAX_REWARD, rounded))
 
 
 class PrivacyGuardianEnvironment:
@@ -81,6 +91,8 @@ class PrivacyGuardianEnvironment:
             doc=self._current_doc,
         )
 
+        reward = _clamp_strict_score(reward)
+
         self._total_reward += reward
         self._pii_found += info.get("pii_removed", 0)
 
@@ -99,13 +111,13 @@ class PrivacyGuardianEnvironment:
             task_description=config["description"],
             pii_categories=config["pii_categories"],
             step=self._step,
-            last_reward=round(reward, 4),
+            last_reward=reward,
             feedback=feedback,
         )
 
         return StepResult(
             observation=obs,
-            reward=round(reward, 4),
+            reward=reward,
             done=self._done,
             info=info,
         )

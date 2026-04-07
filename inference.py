@@ -41,6 +41,15 @@ MAX_STEPS               = 3
 TEMPERATURE             = 0.2
 MAX_TOKENS              = 1000
 SUCCESS_SCORE_THRESHOLD = 0.5
+STRICT_MIN_SCORE = 0.0001
+STRICT_MAX_SCORE = 0.9999
+
+
+def strict_score(value: float) -> float:
+    """Clamp scores to strict open interval (0, 1)."""
+    clamped = max(STRICT_MIN_SCORE, min(STRICT_MAX_SCORE, float(value)))
+    rounded = round(clamped, 4)
+    return max(STRICT_MIN_SCORE, min(STRICT_MAX_SCORE, rounded))
 
 SYSTEM_PROMPT = textwrap.dedent("""
     You are an expert Data Privacy Officer specializing in GDPR and HIPAA compliance.
@@ -191,7 +200,7 @@ async def run_task(
             )
 
             step_result = await env_step(http, redacted)
-            reward = float(step_result.get("reward", 0.0))
+            reward = strict_score(float(step_result.get("reward", STRICT_MIN_SCORE)))
             done   = step_result.get("done", False)
             error  = None
 
@@ -206,12 +215,12 @@ async def run_task(
             if done:
                 break
 
-        avg = sum(rewards) / len(rewards) if rewards else 0.0
+        avg = sum(rewards) / len(rewards) if rewards else STRICT_MIN_SCORE
         success = avg >= SUCCESS_SCORE_THRESHOLD
 
     except Exception as exc:
         print(f"[DEBUG] Task {task_name} error: {exc}", flush=True)
-        rewards = rewards or [0.0]
+        rewards = rewards or [STRICT_MIN_SCORE]
 
     finally:
         try:
@@ -254,7 +263,7 @@ async def main() -> None:
         # Summary
         print("\n[DEBUG] ====== SUMMARY ======", flush=True)
         for r in all_results:
-            avg = sum(r["rewards"]) / len(r["rewards"]) if r["rewards"] else 0.0
+            avg = sum(r["rewards"]) / len(r["rewards"]) if r["rewards"] else STRICT_MIN_SCORE
             print(f"[DEBUG] {r['task']}: avg={avg:.2f} success={r['success']}", flush=True)
 
 
