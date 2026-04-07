@@ -6,12 +6,12 @@ MANDATORY FORMAT — do not deviate:
   [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
   [END]   success=<true|false> steps=<n> rewards=<r1,r2,...,rn>
 
-Environment variables:
-  API_BASE_URL      The API endpoint for the LLM
-  MODEL_NAME        The model identifier to use for inference
-  HF_TOKEN          Your Hugging Face / API key (no default — must be set)
-  LOCAL_IMAGE_NAME  Docker image name if using from_docker_image()
-  ENV_BASE_URL      Environment base URL (default: http://localhost:7860)
+Environment variables required:
+  API_BASE_URL   The API endpoint for the LLM
+  MODEL_NAME     The model identifier to use for inference
+  HF_TOKEN       Your Hugging Face / API key
+  IMAGE_NAME     Docker image name (if using from_docker_image())
+  ENV_BASE_URL   Environment base URL (default: http://localhost:7860)
 """
 
 import asyncio
@@ -22,13 +22,13 @@ from typing import List, Optional
 import httpx
 from openai import OpenAI
 
-# ── Config — exactly as required by hackathon dashboard ───────────────────────
+# ── Config ────────────────────────────────────────────────────────────────────
 API_BASE_URL     = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME       = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN         = os.getenv("HF_TOKEN")           # No default — must be set explicitly
+HF_TOKEN         = os.getenv("HF_TOKEN")
 API_KEY          = HF_TOKEN or os.getenv("API_KEY")
-LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")   # Optional — if using from_docker_image()
 ENV_BASE_URL     = os.getenv("ENV_BASE_URL", "http://localhost:7860")
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")   # Docker image name if using from_docker_image()
 
 TASK_NAMES = [
     "pattern_redaction",
@@ -41,15 +41,6 @@ MAX_STEPS               = 3
 TEMPERATURE             = 0.2
 MAX_TOKENS              = 1000
 SUCCESS_SCORE_THRESHOLD = 0.5
-STRICT_MIN_SCORE = 0.0001
-STRICT_MAX_SCORE = 0.9999
-
-
-def strict_score(value: float) -> float:
-    """Clamp scores to strict open interval (0, 1)."""
-    clamped = max(STRICT_MIN_SCORE, min(STRICT_MAX_SCORE, float(value)))
-    rounded = round(clamped, 4)
-    return max(STRICT_MIN_SCORE, min(STRICT_MAX_SCORE, rounded))
 
 SYSTEM_PROMPT = textwrap.dedent("""
     You are an expert Data Privacy Officer specializing in GDPR and HIPAA compliance.
@@ -64,7 +55,6 @@ SYSTEM_PROMPT = textwrap.dedent("""
        - Aadhaar / national IDs -> [AADHAAR]
        - Physical addresses     -> [ADDRESS]
        - Other IDs (PAN, EmpID) -> [ID]
-       - Date of birth          -> [DOB]
     2. Preserve ALL non-PII content — medical terms, financial figures,
        business context, and analytical information must remain intact.
     3. Return ONLY the redacted document text. No explanation, no preamble.
@@ -112,7 +102,7 @@ def get_redacted_text(
         Document to redact:
         {document}
 
-        Return ONLY the redacted document text. No explanation, no preamble.
+        Return ONLY the redacted document text. No explanation, no dashes, no preamble.
     """).strip()
 
     try:
@@ -155,7 +145,7 @@ async def env_step(http: httpx.AsyncClient, redacted_text: str) -> dict:
 
 
 async def env_close(http: httpx.AsyncClient) -> None:
-    """Called after every episode — mirrors env.close() from OpenEnv pattern."""
+    """Called after every episode — mirrors env.close() in the OpenEnv pattern."""
     try:
         await http.post(f"{ENV_BASE_URL}/reset", timeout=10.0)
         print("[DEBUG] env.close() — environment reset for cleanup", flush=True)
@@ -200,7 +190,7 @@ async def run_task(
             )
 
             step_result = await env_step(http, redacted)
-            reward = strict_score(float(step_result.get("reward", STRICT_MIN_SCORE)))
+            reward = float(step_result.get("reward", 0.0))
             done   = step_result.get("done", False)
             error  = None
 
@@ -215,14 +205,15 @@ async def run_task(
             if done:
                 break
 
-        avg = sum(rewards) / len(rewards) if rewards else STRICT_MIN_SCORE
+        avg = sum(rewards) / len(rewards) if rewards else 0.0
         success = avg >= SUCCESS_SCORE_THRESHOLD
 
     except Exception as exc:
         print(f"[DEBUG] Task {task_name} error: {exc}", flush=True)
-        rewards = rewards or [STRICT_MIN_SCORE]
+        rewards = rewards or [0.0]
 
     finally:
+        # Always close — mirrors env.close() from the dashboard sample script
         try:
             await env_close(http)
         except Exception as e:
@@ -237,7 +228,7 @@ async def main() -> None:
     print(f"[DEBUG] ENV_BASE_URL={ENV_BASE_URL}", flush=True)
     print(f"[DEBUG] API_BASE_URL={API_BASE_URL}", flush=True)
     print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
-    print(f"[DEBUG] LOCAL_IMAGE_NAME={LOCAL_IMAGE_NAME}", flush=True)
+    print(f"[DEBUG] IMAGE_NAME={IMAGE_NAME}", flush=True)
 
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
@@ -263,7 +254,7 @@ async def main() -> None:
         # Summary
         print("\n[DEBUG] ====== SUMMARY ======", flush=True)
         for r in all_results:
-            avg = sum(r["rewards"]) / len(r["rewards"]) if r["rewards"] else STRICT_MIN_SCORE
+            avg = sum(r["rewards"]) / len(r["rewards"]) if r["rewards"] else 0.0
             print(f"[DEBUG] {r['task']}: avg={avg:.2f} success={r['success']}", flush=True)
 
 
