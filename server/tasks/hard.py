@@ -207,8 +207,8 @@ def get_document(step: int) -> Dict:
     return HARD_DOCUMENTS[idx]
 
 
-MIN_SCORE = 0.0001
-MAX_SCORE = 0.9999
+MIN_SCORE = 0.01
+MAX_SCORE = 0.99
 
 
 def _strict_score(value: float) -> float:
