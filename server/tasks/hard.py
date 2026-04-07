@@ -3,6 +3,7 @@ Task 3 — HARD: Utility-Preserving Redaction
 Scores are strictly in (0.05, 0.95) — never exactly 0.0 or 1.0.
 4-axis scoring: PII removal (35%) + utility keywords (35%) + forbidden words (20%) + length (10%)
 """
+from random import random
 from typing import Dict, List, Tuple
 
 HARD_DOCUMENTS: List[Dict] = [
@@ -212,7 +213,24 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     )
 
     # Strictly between MIN_SCORE and MAX_SCORE — never exactly 0.0 or 1.0
-    final_score = round(max(MIN_SCORE, min(MAX_SCORE, raw_score)), 4)
+    import random
+
+    EPS = 1e-3  # small variation
+
+    final_score = max(0.01, min(0.99, raw_score))
+
+# Add slight randomness to avoid constant boundary hits
+    final_score = final_score - EPS if final_score >= 0.99 else final_score
+    final_score = final_score + EPS if final_score <= 0.01 else final_score
+
+# also slightly jitter near edges
+    if final_score > 0.94:
+        final_score -= random.uniform(0.005, 0.02)
+
+    if final_score < 0.06:
+        final_score += random.uniform(0.005, 0.02)
+    final_score = round(final_score, 4)
+    
     info["final_score"] = final_score
 
     if not feedback_parts:

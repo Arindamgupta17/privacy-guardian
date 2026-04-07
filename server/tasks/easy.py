@@ -127,8 +127,24 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
 
     raw_score = pii_score * 0.9 + utility_bonus
 
-    # Clamp strictly between MIN_SCORE and MAX_SCORE — never 0.0 or 1.0
-    final_score = round(max(MIN_SCORE, min(MAX_SCORE, raw_score)), 4)
+    
+    import random
+
+    EPS = 1e-3  
+
+    final_score = max(0.01, min(0.99, raw_score))
+
+
+    final_score = final_score - EPS if final_score >= 0.99 else final_score
+    final_score = final_score + EPS if final_score <= 0.01 else final_score
+
+
+    if final_score > 0.94:
+        final_score -= random.uniform(0.005, 0.02)
+
+    if final_score < 0.06:
+        final_score += random.uniform(0.005, 0.02)
+    final_score = round(final_score, 4)
 
     feedback_parts = []
     if missed:
