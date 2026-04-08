@@ -17,10 +17,9 @@ Environment variables required:
 import asyncio
 import os
 import textwrap
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import httpx
-from openai import OpenAI
 
 # ── Config ────────────────────────────────────────────────────────────────────
 API_BASE_URL     = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
@@ -29,6 +28,7 @@ HF_TOKEN         = os.getenv("HF_TOKEN")
 API_KEY          = HF_TOKEN or os.getenv("API_KEY")
 ENV_BASE_URL     = os.getenv("ENV_BASE_URL", "http://localhost:7860")
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")   # Docker image name if using from_docker_image()
+IMAGE_NAME       = os.getenv("IMAGE_NAME", LOCAL_IMAGE_NAME or "")
 
 TASK_NAMES = [
     "pattern_redaction",
@@ -87,8 +87,8 @@ def log_end(success: bool, steps: int, rewards: List[float]) -> None:
 
 
 # ── LLM call ──────────────────────────────────────────────────────────────────
-def get_redacted_text(
-    client: OpenAI,
+async def get_redacted_text(
+    client: httpx.AsyncClient,
     document: str,
     task_description: str,
     pii_categories: List[str],
@@ -106,17 +106,25 @@ def get_redacted_text(
     """).strip()
 
     try:
-        completion = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
+        completion_payload = {
+            "model": MODEL_NAME,
+            "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user",   "content": user_prompt},
+                {"role": "user", "content": user_prompt},
             ],
-            temperature=TEMPERATURE,
-            max_tokens=MAX_TOKENS,
-            stream=False,
+            "temperature": TEMPERATURE,
+            "max_tokens": MAX_TOKENS,
+            "stream": False,
+        }
+        response = await client.post(
+            f"{API_BASE_URL.rstrip('/')}/chat/completions",
+            json=completion_payload,
+            headers={"Authorization": f"Bearer {os.environ.get('API_KEY', '')}"},
+            timeout=60.0,
         )
-        text = (completion.choices[0].message.content or "").strip()
+        response.raise_for_status()
+        completion = response.json()
+        text = (completion["choices"][0]["message"]["content"] or "").strip()
         return text if text else document
     except Exception as exc:
         print(f"[DEBUG] Model request failed: {exc}", flush=True)
@@ -163,7 +171,7 @@ async def env_health(http: httpx.AsyncClient) -> bool:
 
 # ── Single task loop ──────────────────────────────────────────────────────────
 async def run_task(
-    client: OpenAI,
+    client: httpx.AsyncClient,
     http: httpx.AsyncClient,
     task_name: str,
 ) -> dict:
@@ -181,7 +189,7 @@ async def run_task(
             if result.get("done", False):
                 break
 
-            redacted = get_redacted_text(
+            redacted = await get_redacted_text(
                 client=client,
                 document=obs["document"],
                 task_description=obs["task_description"],
@@ -230,8 +238,6 @@ async def main() -> None:
     print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
     print(f"[DEBUG] IMAGE_NAME={IMAGE_NAME}", flush=True)
 
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
-
     async with httpx.AsyncClient(timeout=60.0) as http:
 
         # Wait for environment to be healthy
@@ -247,7 +253,7 @@ async def main() -> None:
         # Run all 3 tasks sequentially
         all_results = []
         for task_name in TASK_NAMES:
-            result = await run_task(client, http, task_name)
+            result = await run_task(http, http, task_name)
             all_results.append(result)
             await asyncio.sleep(1)
 
