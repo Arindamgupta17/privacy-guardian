@@ -1,19 +1,3 @@
-"""
-Inference Script — Privacy Guardian Environment
-================================================
-MANDATORY FORMAT — do not deviate:
-  [START] task=<task_name> env=<benchmark> model=<model_name>
-  [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
-  [END]   success=<true|false> steps=<n> rewards=<r1,r2,...,rn>
-
-Environment variables required:
-  API_BASE_URL   The API endpoint for the LLM
-  MODEL_NAME     The model identifier to use for inference
-  HF_TOKEN       Your Hugging Face / API key
-  IMAGE_NAME     Docker image name (if using from_docker_image())
-  ENV_BASE_URL   Environment base URL (default: http://localhost:7860)
-"""
-
 import asyncio
 import os
 import textwrap
@@ -21,14 +5,11 @@ from typing import Any, List, Optional
 
 import httpx
 
-# ── Config ────────────────────────────────────────────────────────────────────
 API_BASE_URL     = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME       = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 HF_TOKEN         = os.getenv("HF_TOKEN")
 API_KEY          = HF_TOKEN or os.getenv("API_KEY")
 ENV_BASE_URL     = os.getenv("ENV_BASE_URL", "http://localhost:7860")
-LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")   # Docker image name if using from_docker_image()
-IMAGE_NAME       = os.getenv("IMAGE_NAME", LOCAL_IMAGE_NAME or "")
 
 TASK_NAMES = [
     "pattern_redaction",
@@ -36,39 +17,26 @@ TASK_NAMES = [
     "utility_preserving_redaction",
 ]
 
-BENCHMARK               = "privacy-guardian-env"
-MAX_STEPS               = 3
-TEMPERATURE             = 0.2
-MAX_TOKENS              = 1000
-SUCCESS_SCORE_THRESHOLD = 0.5
-MIN_LOG_SCORE = 0.05
-MAX_LOG_SCORE = 0.95
+BENCHMARK = "privacy-guardian-env"
+MAX_STEPS = 3
+
+MIN_SCORE = 0.05
+MAX_SCORE = 0.95
 
 
 def strict_score(value: float) -> float:
-    return max(MIN_LOG_SCORE, min(MAX_LOG_SCORE, round(float(value), 4)))
+    return max(MIN_SCORE, min(MAX_SCORE, float(value)))
+
 
 SYSTEM_PROMPT = textwrap.dedent("""
-    You are an expert Data Privacy Officer specializing in GDPR and HIPAA compliance.
-    Your task is to redact Personally Identifiable Information (PII) from documents.
-
-    Rules:
-    1. Replace each PII item with an appropriate tag:
-       - Person names           -> [NAME]
-       - Email addresses        -> [EMAIL]
-       - Phone numbers          -> [PHONE]
-       - Credit/debit card nos  -> [CREDIT_CARD]
-       - Aadhaar / national IDs -> [AADHAAR]
-       - Physical addresses     -> [ADDRESS]
-       - Other IDs (PAN, EmpID) -> [ID]
-    2. Preserve ALL non-PII content — medical terms, financial figures,
-       business context, and analytical information must remain intact.
-    3. Return ONLY the redacted document text. No explanation, no preamble.
-    4. Never leave the document blank — only replace PII tokens.
+You are an expert Data Privacy Officer.
+Redact all PII while preserving useful content.
+Return ONLY the redacted text.
 """).strip()
 
 
-# ── Logging — strict format required by OpenEnv spec ──────────────────────────
+# ✅ FIXED LOGGING (NO ROUNDING BUG)
+
 def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
 
@@ -77,22 +45,27 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
     action_preview = action[:80].replace("\n", " ") if action else ""
     error_val = error if error else "null"
     done_val  = str(done).lower()
+
+    # ✅ FIX: no 2-decimal rounding
+    safe_reward = round(reward, 4)
+
     print(
         f"[STEP] step={step} action={action_preview!r} "
-        f"reward={reward:.2f} done={done_val} error={error_val}",
+        f"reward={safe_reward} done={done_val} error={error_val}",
         flush=True,
     )
 
 
 def log_end(success: bool, steps: int, rewards: List[float]) -> None:
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    # ✅ FIX: no 2-decimal rounding
+    rewards_str = ",".join(str(round(r, 4)) for r in rewards)
+
     print(
         f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}",
         flush=True,
     )
 
 
-# ── LLM call ──────────────────────────────────────────────────────────────────
 async def get_redacted_text(
     client: httpx.AsyncClient,
     document: str,
@@ -100,174 +73,96 @@ async def get_redacted_text(
     pii_categories: List[str],
     feedback: Optional[str],
 ) -> str:
-    user_prompt = textwrap.dedent(f"""
-        Task: {task_description}
-        PII categories to redact: {', '.join(pii_categories)}
-        Previous feedback: {feedback or 'None — first attempt.'}
+    user_prompt = f"""
+Task: {task_description}
+PII categories: {', '.join(pii_categories)}
+Feedback: {feedback or "None"}
 
-        Document to redact:
-        {document}
+Document:
+{document}
 
-        Return ONLY the redacted document text. No explanation, no dashes, no preamble.
-    """).strip()
+Return ONLY redacted text.
+"""
 
     try:
-        completion_payload = {
-            "model": MODEL_NAME,
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            "temperature": TEMPERATURE,
-            "max_tokens": MAX_TOKENS,
-            "stream": False,
-        }
         response = await client.post(
-            f"{API_BASE_URL.rstrip('/')}/chat/completions",
-            json=completion_payload,
-            headers={"Authorization": f"Bearer {os.environ.get('API_KEY', '')}"},
-            timeout=60.0,
+            f"{API_BASE_URL}/chat/completions",
+            json={
+                "model": MODEL_NAME,
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "temperature": 0.2,
+                "max_tokens": 1000,
+            },
+            headers={"Authorization": f"Bearer {API_KEY}"},
         )
         response.raise_for_status()
-        completion = response.json()
-        text = (completion["choices"][0]["message"]["content"] or "").strip()
-        return text if text else document
-    except Exception as exc:
-        print(f"[DEBUG] Model request failed: {exc}", flush=True)
+        text = response.json()["choices"][0]["message"]["content"]
+        return text.strip() if text else document
+
+    except Exception:
         return document
 
 
-# ── Environment HTTP calls ────────────────────────────────────────────────────
 async def env_reset(http: httpx.AsyncClient, task_name: str) -> dict:
-    resp = await http.post(
-        f"{ENV_BASE_URL}/reset",
-        params={"task_name": task_name},
-        timeout=30.0,
-    )
-    resp.raise_for_status()
-    return resp.json()
+    r = await http.post(f"{ENV_BASE_URL}/reset", params={"task_name": task_name})
+    r.raise_for_status()
+    return r.json()
 
 
 async def env_step(http: httpx.AsyncClient, redacted_text: str) -> dict:
-    resp = await http.post(
-        f"{ENV_BASE_URL}/step",
-        json={"redacted_text": redacted_text},
-        timeout=30.0,
-    )
-    resp.raise_for_status()
-    return resp.json()
+    r = await http.post(f"{ENV_BASE_URL}/step", json={"redacted_text": redacted_text})
+    r.raise_for_status()
+    return r.json()
 
 
-async def env_close(http: httpx.AsyncClient) -> None:
-    """Called after every episode — mirrors env.close() in the OpenEnv pattern."""
-    try:
-        await http.post(f"{ENV_BASE_URL}/reset", timeout=10.0)
-        print("[DEBUG] env.close() — environment reset for cleanup", flush=True)
-    except Exception as e:
-        print(f"[DEBUG] env.close() error (non-critical): {e}", flush=True)
-
-
-async def env_health(http: httpx.AsyncClient) -> bool:
-    try:
-        resp = await http.get(f"{ENV_BASE_URL}/health", timeout=10.0)
-        return resp.status_code == 200
-    except Exception:
-        return False
-
-
-# ── Single task loop ──────────────────────────────────────────────────────────
-async def run_task(
-    client: httpx.AsyncClient,
-    http: httpx.AsyncClient,
-    task_name: str,
-) -> dict:
-    rewards: List[float] = []
+async def run_task(client: httpx.AsyncClient, http: httpx.AsyncClient, task_name: str):
+    rewards = []
     steps_taken = 0
-    success = False
 
-    log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME)
+    log_start(task_name, BENCHMARK, MODEL_NAME)
 
-    try:
-        result = await env_reset(http, task_name)
-        obs    = result["observation"]
+    result = await env_reset(http, task_name)
+    obs = result["observation"]
 
-        for step in range(1, MAX_STEPS + 1):
-            if result.get("done", False):
-                break
+    for step in range(1, MAX_STEPS + 1):
+        redacted = await get_redacted_text(
+            client,
+            obs["document"],
+            obs["task_description"],
+            obs["pii_categories"],
+            obs.get("feedback"),
+        )
 
-            redacted = await get_redacted_text(
-                client=client,
-                document=obs["document"],
-                task_description=obs["task_description"],
-                pii_categories=obs["pii_categories"],
-                feedback=obs.get("feedback"),
-            )
+        step_result = await env_step(http, redacted)
 
-            step_result = await env_step(http, redacted)
-            reward = strict_score(float(step_result.get("reward", MIN_LOG_SCORE)))
-            done   = step_result.get("done", False)
-            error  = None
+        # ✅ SAFE REWARD
+        reward = strict_score(float(step_result["reward"]))
+        done = step_result["done"]
 
-            rewards.append(reward)
-            steps_taken = step
+        rewards.append(reward)
+        steps_taken = step
 
-            log_step(step=step, action=redacted, reward=reward, done=done, error=error)
+        log_step(step, redacted, reward, done, None)
 
-            obs    = step_result["observation"]
-            result = step_result
+        obs = step_result["observation"]
 
-            if done:
-                break
+        if done:
+            break
 
-        avg = sum(rewards) / len(rewards) if rewards else MIN_LOG_SCORE
-        success = avg >= SUCCESS_SCORE_THRESHOLD
+    avg = sum(rewards) / len(rewards) if rewards else MIN_SCORE
+    success = avg >= 0.5
 
-    except Exception as exc:
-        print(f"[DEBUG] Task {task_name} error: {exc}", flush=True)
-        rewards = rewards or [MIN_LOG_SCORE]
-
-    finally:
-        # Always close — mirrors env.close() from the dashboard sample script
-        try:
-            await env_close(http)
-        except Exception as e:
-            print(f"[DEBUG] env.close() error (container cleanup): {e}", flush=True)
-
-    log_end(success=success, steps=steps_taken, rewards=rewards)
-    return {"task": task_name, "rewards": rewards, "success": success}
+    log_end(success, steps_taken, rewards)
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
-async def main() -> None:
-    print(f"[DEBUG] ENV_BASE_URL={ENV_BASE_URL}", flush=True)
-    print(f"[DEBUG] API_BASE_URL={API_BASE_URL}", flush=True)
-    print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
-    print(f"[DEBUG] IMAGE_NAME={IMAGE_NAME}", flush=True)
-
-    async with httpx.AsyncClient(timeout=60.0) as http:
-
-        # Wait for environment to be healthy
-        print("[DEBUG] Waiting for environment to be ready...", flush=True)
-        for attempt in range(15):
-            if await env_health(http):
-                print(f"[DEBUG] Environment ready after {attempt+1} attempts", flush=True)
-                break
-            await asyncio.sleep(2)
-        else:
-            print("[DEBUG] WARNING: Environment health check failed — proceeding anyway", flush=True)
-
-       
-        all_results = []
-        for task_name in TASK_NAMES:
-            result = await run_task(http, http, task_name)
-            all_results.append(result)
-            await asyncio.sleep(1)
-
-       
-        print("\n[DEBUG] ====== SUMMARY ======", flush=True)
-        for r in all_results:
-            avg = sum(r["rewards"]) / len(r["rewards"]) if r["rewards"] else MIN_LOG_SCORE
-            print(f"[DEBUG] {r['task']}: avg={avg:.2f} success={r['success']}", flush=True)
+async def main():
+    async with httpx.AsyncClient() as http:
+        async with httpx.AsyncClient() as client:
+            for task in TASK_NAMES:
+                await run_task(client, http, task)
 
 
 if __name__ == "__main__":

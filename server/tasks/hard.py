@@ -6,8 +6,14 @@ Scores strictly in (0.05, 0.95).
 from typing import Dict, List, Tuple
 
 HARD_DOCUMENTS: List[Dict] = [
-    # (keep your existing documents exactly same — no change needed)
-    # 👉 I am not modifying your dataset, only scoring logic
+    {
+        "id": "hard_001",
+        "text": "Rohit Sharma has diabetes and is prescribed Metformin.",
+        "pii_items": ["Rohit Sharma"],
+        "utility_keywords": ["diabetes", "metformin"],
+        "forbidden_removals": ["diabetes", "metformin"],
+        "min_length_ratio": 0.5,
+    }
 ]
 
 def clamp(value: float) -> float:
