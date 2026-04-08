@@ -1,19 +1,8 @@
 """
 Task 2 — MEDIUM: Contextual PII Redaction
-==========================================
-PII is embedded in natural language without obvious formatting.
-Examples:
-  - "I spoke with Sarah from Delhi about her account"
-  - "My brother Raj handles all billing queries"
-  - "The patient's son, Arjun, can be contacted"
-
-Ground truth PII is defined at dataset creation time (not inferred dynamically).
-This makes the grader fully deterministic.
-
-Grader: Check what % of ground-truth contextual PII tokens are absent from redacted text.
-Exploit protection: redacted < 30% length of original → strict minimum score
+Scores strictly in (0.05, 0.95).
+Fix: clamp ONLY final score once, not intermediate values.
 """
-
 from typing import Dict, List, Tuple
 
 MEDIUM_DOCUMENTS: List[Dict] = [
@@ -29,41 +18,23 @@ MEDIUM_DOCUMENTS: List[Dict] = [
             "Customer: I'm his wife. Our neighbour Ramesh also has an account with you.\n"
             "Agent: Noted. Let me pull up Vikram's account right away."
         ),
-        "pii_items": [
-            "Sneha Kulkarni",
-            "Sneha",
-            "Vikram",
-            "Vikram Kulkarni",
-            "Pune",
-            "Kothrud",
-            "Ramesh",
-        ],
-        "utility_keywords": ["account", "customer", "support", "registered", "mobile"],
+        "pii_items": ["Sneha Kulkarni","Sneha","Vikram","Vikram Kulkarni","Pune","Kothrud","Ramesh"],
+        "utility_keywords": ["account","customer","support","registered","mobile"],
     },
     {
         "id": "medium_002",
         "text": (
             "Email thread — Internal Escalation\n\n"
-            "From: Support Agent\n"
-            "Subject: Escalation for unhappy customer\n\n"
+            "From: Support Agent\nSubject: Escalation for unhappy customer\n\n"
             "Hi Team,\n\n"
             "I spoke with Deepak Menon today regarding his complaint. He mentioned that his "
             "colleague Anjali had the same problem last month. Deepak is based out of "
             "Hyderabad and works at a firm near Banjara Hills. His manager, whose name he "
             "gave as Mr. Suresh Rao, has also been affected. Deepak said he would escalate "
-            "to the consumer forum if not resolved by Friday.\n\n"
-            "Please prioritize this ticket.\n\nRegards"
+            "to the consumer forum if not resolved by Friday.\n\nPlease prioritize this ticket."
         ),
-        "pii_items": [
-            "Deepak Menon",
-            "Deepak",
-            "Anjali",
-            "Hyderabad",
-            "Banjara Hills",
-            "Suresh Rao",
-            "Mr. Suresh Rao",
-        ],
-        "utility_keywords": ["escalation", "complaint", "consumer", "ticket", "prioritize"],
+        "pii_items": ["Deepak Menon","Deepak","Anjali","Hyderabad","Banjara Hills","Suresh Rao","Mr. Suresh Rao"],
+        "utility_keywords": ["escalation","complaint","consumer","ticket","prioritize"],
     },
     {
         "id": "medium_003",
@@ -74,21 +45,10 @@ MEDIUM_DOCUMENTS: List[Dict] = [
             "in Chennai. Her father, retired Colonel Srinivas, also has a history of "
             "hypertension. The patient mentioned she was previously treated at Apollo "
             "Hospital under a Dr. Prakash. She currently resides near Adyar, Chennai.\n\n"
-            "Diagnosis: Chronic migraine with aura.\n"
-            "Prescribed: Topiramate 50mg."
+            "Diagnosis: Chronic migraine with aura.\nPrescribed: Topiramate 50mg."
         ),
-        "pii_items": [
-            "Dr. Meera Joshi",
-            "Meera Joshi",
-            "Kavitha",
-            "Chennai",
-            "Colonel Srinivas",
-            "Srinivas",
-            "Dr. Prakash",
-            "Prakash",
-            "Adyar",
-        ],
-        "utility_keywords": ["migraine", "hypertension", "diagnosis", "prescribed", "topiramate"],
+        "pii_items": ["Dr. Meera Joshi","Meera Joshi","Kavitha","Chennai","Colonel Srinivas","Srinivas","Dr. Prakash","Prakash","Adyar"],
+        "utility_keywords": ["migraine","hypertension","diagnosis","prescribed","topiramate"],
     },
     {
         "id": "medium_004",
@@ -99,15 +59,8 @@ MEDIUM_DOCUMENTS: List[Dict] = [
             "Their family consultant Vivek from Jayanagar confirmed the policy copy was valid. "
             "Neelima requested priority review before month-end closure."
         ),
-        "pii_items": [
-            "Neelima Rao",
-            "Neelima",
-            "Harish",
-            "Mysuru",
-            "Vivek",
-            "Jayanagar",
-        ],
-        "utility_keywords": ["claimant", "settlement", "documents", "policy", "priority"],
+        "pii_items": ["Neelima Rao","Neelima","Harish","Mysuru","Vivek","Jayanagar"],
+        "utility_keywords": ["claimant","settlement","documents","policy","priority"],
     },
     {
         "id": "medium_005",
@@ -118,91 +71,75 @@ MEDIUM_DOCUMENTS: List[Dict] = [
             "Farhan mentioned that coordinator Joseph from Ernakulam tracked the incident timeline. "
             "Lata asked the audit team to finalize the mitigation report by Friday."
         ),
-        "pii_items": [
-            "Farhan Ali",
-            "Farhan",
-            "Lata Menon",
-            "Lata",
-            "Kochi",
-            "Joseph",
-            "Ernakulam",
-        ],
-        "utility_keywords": ["review", "operations", "incident", "audit", "mitigation"],
+        "pii_items": ["Farhan Ali","Farhan","Lata Menon","Lata","Kochi","Joseph","Ernakulam"],
+        "utility_keywords": ["review","operations","incident","audit","mitigation"],
     },
 ]
 
-MIN_SCORE = 0.05
-MAX_SCORE = 0.95
 
-
-def _strict_score(value: float) -> float:
-    return max(MIN_SCORE, min(MAX_SCORE, round(float(value), 4)))
+def clamp(value: float) -> float:
+    """Clamp to strictly (0.05, 0.95) — called ONCE on final score only."""
+    return round(max(0.05, min(0.95, float(value))), 4)
 
 
 def get_task_config() -> Dict:
     return {
         "name": "contextual_redaction",
         "description": (
-            "Identify and redact PII that is embedded in natural language. "
-            "Unlike obvious patterns (emails, phone numbers), this PII includes: "
-            "person names mentioned in conversation, city/neighbourhood names tied "
-            "to individuals, relationship references ('his wife', 'her sister'). "
-            "Replace all personal names and location identifiers with [NAME] or [LOCATION]. "
-            "Preserve the analytical/business content of the document."
+            "Identify and redact PII embedded in natural language — "
+            "person names, city/neighbourhood names tied to individuals, "
+            "and relationship references. "
+            "Replace names with [NAME] and locations with [LOCATION]. "
+            "Preserve all analytical and business content."
         ),
-        "pii_categories": ["NAME", "LOCATION", "RELATIONSHIP_REFERENCE"],
+        "pii_categories": ["NAME","LOCATION","RELATIONSHIP_REFERENCE"],
         "max_steps": 3,
     }
 
 
 def get_document(step: int) -> Dict:
-    idx = (step - 1) % len(MEDIUM_DOCUMENTS)
-    return MEDIUM_DOCUMENTS[idx]
+    return MEDIUM_DOCUMENTS[(step - 1) % len(MEDIUM_DOCUMENTS)]
 
 
 def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
-    """
-    Scoring breakdown:
-            - Over-redaction guard: redacted < 30% of original → strict minimum score
-      - PII removal score (80%): % of ground-truth PII items absent from redacted text
-      - Utility preservation (20%): utility keywords still present
-    """
+    # Exploit guard
     if len(redacted.strip()) < 0.30 * len(original):
-        return MIN_SCORE, "Over-redaction: document too short. Preserve non-PII content.", {"exploit": "over_redaction", "final_score": MIN_SCORE}
+        return 0.05, "Over-redaction: document too short. Preserve non-PII content.", {"exploit": "over_redaction"}
 
-    pii_items: List[str] = doc["pii_items"]
-    removed = 0
-    missed = []
-
+    pii_items = doc["pii_items"]
+    removed, missed = 0, []
     for item in pii_items:
-        # Check for exact string absence (case-insensitive)
         if item.lower() not in redacted.lower():
             removed += 1
         else:
             missed.append(item)
 
-    pii_score = _strict_score(removed / len(pii_items) if pii_items else MIN_SCORE)
+    # Raw intermediate values — NOT clamped individually
+    pii_ratio = removed / len(pii_items) if pii_items else 0.0
 
-    # Utility keywords check
     utility_keywords = doc.get("utility_keywords", [])
     keywords_present = sum(1 for kw in utility_keywords if kw.lower() in redacted.lower())
-    utility_ratio = _strict_score(keywords_present / len(utility_keywords) if utility_keywords else MIN_SCORE)
+    utility_ratio = keywords_present / len(utility_keywords) if utility_keywords else 0.0
 
-    final_score = _strict_score(pii_score * 0.80 + utility_ratio * 0.20)
+    raw = pii_ratio * 0.80 + utility_ratio * 0.20
+
+    # Clamp ONCE at the end
+    final_score = clamp(raw)
 
     feedback_parts = []
     if missed:
-        feedback_parts.append(f"Contextual PII still present: {missed[:3]}{'...' if len(missed) > 3 else ''}")
+        feedback_parts.append(f"Contextual PII still present ({len(missed)}): {missed[:3]}{'...' if len(missed)>3 else ''}")
     if utility_ratio < 0.75:
-        feedback_parts.append("Important non-PII content was removed — preserve business context.")
+        feedback_parts.append("Important content removed — preserve non-PII context.")
     if not feedback_parts:
-        feedback_parts.append("All contextual PII redacted and document utility preserved. Well done!")
+        feedback_parts.append("All contextual PII redacted and document utility preserved!")
 
     info = {
+        "pii_total": len(pii_items),
+        "pii_removed": removed,
         "pii_missed": missed,
-        "utility_ratio": _strict_score(utility_ratio),
-        "pii_score": _strict_score(pii_score),
+        "utility_ratio": round(utility_ratio, 4),
+        "pii_ratio": round(pii_ratio, 4),
         "final_score": final_score,
     }
-
     return final_score, " | ".join(feedback_parts), info

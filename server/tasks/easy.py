@@ -1,21 +1,10 @@
 """
 Task 1 — EASY: Pattern PII Redaction
-=====================================
-Documents contain clearly formatted, obvious PII:
-  - Email addresses
-  - Phone numbers (Indian + international formats)
-  - Credit card numbers
-  - Aadhaar numbers (Indian national ID)
-
-Grader: Check what % of planted PII tokens are gone from the redacted text.
-Exploit protection: If redacted text is < 30% length of original → strict minimum score
+Scores strictly in (0.05, 0.95) — never 0.0 or 1.0.
+Fix: clamp ONLY the final score, not intermediate values.
 """
-
 import re
 from typing import Dict, List, Tuple
-
-# ── Synthetic documents with planted PII ──────────────────────────────────────
-# Each document has a ground-truth list of PII strings that MUST be redacted.
 
 EASY_DOCUMENTS: List[Dict] = [
     {
@@ -28,13 +17,8 @@ EASY_DOCUMENTS: List[Dict] = [
             "for this purchase. My Aadhaar number is 1234 5678 9012. Please resolve this "
             "at the earliest.\n\nRegards,\nAmit"
         ),
-        "pii_items": [
-            "amit.sharma@gmail.com",
-            "9876543210",
-            "4111 1111 1111 1111",
-            "1234 5678 9012",
-        ],
-        "utility_keywords": ["order", "billing", "purchase", "support"],
+        "pii_items": ["amit.sharma@gmail.com","9876543210","4111 1111 1111 1111","1234 5678 9012"],
+        "utility_keywords": ["order","billing","purchase","support"],
     },
     {
         "id": "easy_002",
@@ -49,14 +33,8 @@ EASY_DOCUMENTS: List[Dict] = [
             "Aadhaar: 9876 5432 1098\n"
             "Status: Escalated to L2 support."
         ),
-        "pii_items": [
-            "priya.nair@outlook.com",
-            "+91-98765-43210",
-            "080-22334455",
-            "5500 0000 0000 0004",
-            "9876 5432 1098",
-        ],
-        "utility_keywords": ["refund", "escalated", "support", "complaint"],
+        "pii_items": ["priya.nair@outlook.com","+91-98765-43210","080-22334455","5500 0000 0000 0004","9876 5432 1098"],
+        "utility_keywords": ["refund","escalated","support","complaint"],
     },
     {
         "id": "easy_003",
@@ -69,66 +47,42 @@ EASY_DOCUMENTS: List[Dict] = [
             "Transaction of Rs. 4,500 was made at Amazon.in on 01-Apr-2026.\n"
             "If this was not you, call our helpline immediately."
         ),
-        "pii_items": [
-            "rahul.v@ymail.com",
-            "7654321098",
-            "3782 822463 10005",
-        ],
-        "utility_keywords": ["transaction", "amazon", "banking", "helpline"],
+        "pii_items": ["rahul.v@ymail.com","7654321098","3782 822463 10005"],
+        "utility_keywords": ["transaction","amazon","banking","helpline"],
     },
     {
         "id": "easy_004",
         "text": (
             "Courier Delivery Update\n\n"
             "Hi Nisha, your package #PKG-7712 is out for delivery. "
-            "For delivery coordination, contact nisha.kapoor@mail.com or call 9987654321. "
+            "Contact nisha.kapoor@mail.com or call 9987654321. "
             "Backup contact: +91 91234 56789. "
             "Payment was processed using card 6011 0009 9013 9424. "
-            "Delivery location: 9, Residency Road, Jaipur. "
             "Please keep OTP ready at the time of handover."
         ),
-        "pii_items": [
-            "nisha.kapoor@mail.com",
-            "9987654321",
-            "+91 91234 56789",
-            "6011 0009 9013 9424",
-        ],
-        "utility_keywords": ["delivery", "package", "payment", "otp"],
+        "pii_items": ["nisha.kapoor@mail.com","9987654321","+91 91234 56789","6011 0009 9013 9424"],
+        "utility_keywords": ["delivery","package","payment","otp"],
     },
     {
         "id": "easy_005",
         "text": (
             "Utility Bill Reminder\n\n"
             "Dear customer, your electricity bill for April is pending. "
-            "Registered user: Arjun Mehta. "
             "Email: arjun.mehta@provider.net. "
             "Registered mobile: 9090909090. "
             "Customer support helpline: 022-44556677. "
             "Aadhaar linked to account: 4567 8912 3456. "
             "Kindly pay before due date to avoid late fee."
         ),
-        "pii_items": [
-            "arjun.mehta@provider.net",
-            "9090909090",
-            "022-44556677",
-            "4567 8912 3456",
-        ],
-        "utility_keywords": ["bill", "electricity", "due date", "late fee"],
+        "pii_items": ["arjun.mehta@provider.net","9090909090","022-44556677","4567 8912 3456"],
+        "utility_keywords": ["bill","electricity","due date","late fee"],
     },
 ]
 
-# ── Regex patterns for common PII ─────────────────────────────────────────────
-EMAIL_RE    = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
-PHONE_RE    = re.compile(r"(\+91[-\s]?)?[6-9]\d{9}|0\d{2,4}[-\s]\d{6,8}")
-CARD_RE     = re.compile(r"\b(?:\d[ \-]?){13,16}\b")
-AADHAAR_RE  = re.compile(r"\b\d{4}\s\d{4}\s\d{4}\b")
 
-MIN_SCORE = 0.05
-MAX_SCORE = 0.95
-
-
-def _strict_score(value: float) -> float:
-    return max(MIN_SCORE, min(MAX_SCORE, round(float(value), 4)))
+def clamp(value: float) -> float:
+    """Clamp to strictly (0.05, 0.95) — called ONCE on final score only."""
+    return round(max(0.05, min(0.95, float(value))), 4)
 
 
 def get_task_config() -> Dict:
@@ -136,68 +90,57 @@ def get_task_config() -> Dict:
         "name": "pattern_redaction",
         "description": (
             "Redact all clearly formatted PII from the document. "
-            "This includes email addresses, phone numbers (Indian formats), "
-            "credit/debit card numbers, and Aadhaar numbers. "
-            "Replace each PII item with an appropriate tag like [EMAIL], [PHONE], "
-            "[CREDIT_CARD], or [AADHAAR]. Preserve all other content exactly."
+            "Replace emails with [EMAIL], phones with [PHONE], "
+            "card numbers with [CREDIT_CARD], Aadhaar with [AADHAAR]. "
+            "Preserve all other content exactly."
         ),
-        "pii_categories": ["EMAIL", "PHONE", "CREDIT_CARD", "AADHAAR"],
+        "pii_categories": ["EMAIL","PHONE","CREDIT_CARD","AADHAAR"],
         "max_steps": 3,
     }
 
 
 def get_document(step: int) -> Dict:
-    idx = (step - 1) % len(EASY_DOCUMENTS)
-    return EASY_DOCUMENTS[idx]
+    return EASY_DOCUMENTS[(step - 1) % len(EASY_DOCUMENTS)]
 
 
 def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
-    """
-    Returns (score, feedback, info_dict).
-
-    Scoring breakdown:
-            - Over-redaction guard: if redacted < 30% length of original → strict minimum score
-      - Base score: % of planted PII items successfully removed
-            - Utility bonus: +0.05 if key utility keywords are still present
-    """
-    info = {}
-
-    # ── Exploit guard ─────────────────────────────────────────────────────────
+    # Exploit guard
     if len(redacted.strip()) < 0.30 * len(original):
-        return MIN_SCORE, "Over-redaction detected: the document is too short. Do not blank the entire document.", {"exploit": "over_redaction", "final_score": MIN_SCORE}
+        return 0.05, "Over-redaction: document too short. Only replace PII tokens.", {"exploit": "over_redaction"}
 
-    pii_items: List[str] = doc["pii_items"]
-    removed = 0
-    missed = []
-
+    pii_items = doc["pii_items"]
+    removed, missed = 0, []
     for item in pii_items:
         if item.lower() not in redacted.lower():
             removed += 1
         else:
             missed.append(item)
 
-    pii_score = _strict_score(removed / len(pii_items) if pii_items else MIN_SCORE)
+    # Raw intermediate values — NOT clamped individually
+    pii_ratio = removed / len(pii_items) if pii_items else 0.0
 
-    # ── Utility keyword check ─────────────────────────────────────────────────
     utility_keywords = doc.get("utility_keywords", [])
     keywords_present = sum(1 for kw in utility_keywords if kw.lower() in redacted.lower())
-    utility_bonus = 0.05 if keywords_present >= len(utility_keywords) * 0.75 else MIN_SCORE
+    utility_bonus = 0.05 if keywords_present >= len(utility_keywords) * 0.75 else 0.0
 
-    final_score = _strict_score(pii_score * 0.9 + utility_bonus)
+    raw = pii_ratio * 0.9 + utility_bonus
+
+    # Clamp ONCE at the end
+    final_score = clamp(raw)
 
     feedback_parts = []
     if missed:
-        feedback_parts.append(f"Missed PII: {missed}")
+        feedback_parts.append(f"Missed PII: {missed[:3]}{'...' if len(missed)>3 else ''}")
     if keywords_present < len(utility_keywords) * 0.75:
-        feedback_parts.append("Some utility keywords were removed — preserve non-PII content.")
+        feedback_parts.append("Some utility content removed — preserve non-PII text.")
     if not feedback_parts:
-        feedback_parts.append("Excellent redaction! All PII removed and document utility preserved.")
+        feedback_parts.append("Excellent! All PII removed and document utility preserved.")
 
     info = {
+        "pii_total": len(pii_items),
+        "pii_removed": removed,
         "pii_missed": missed,
-        "pii_score": _strict_score(pii_score),
-        "utility_bonus": _strict_score(utility_bonus),
+        "utility_keywords_present": keywords_present,
         "final_score": final_score,
     }
-
     return final_score, " | ".join(feedback_parts), info
