@@ -176,7 +176,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         else:
             missed.append(item)
 
-    pii_score = removed / len(pii_items) if pii_items else 1.0
+    pii_score = _strict_score(removed / len(pii_items) if pii_items else 1.0)
 
     # ── Utility keyword check ─────────────────────────────────────────────────
     utility_keywords = doc.get("utility_keywords", [])
