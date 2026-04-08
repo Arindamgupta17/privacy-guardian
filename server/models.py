@@ -49,7 +49,7 @@ class RedactionObservation(BaseModel):
     )
     step: int = Field(..., description="Current step number within the episode.")
     last_reward: float = Field(
-        0.01,
+        0.05,
         gt=0,
         lt=1,
         description="Reward from the previous step, strictly between 0 and 1."
