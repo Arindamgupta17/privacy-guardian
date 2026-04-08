@@ -104,15 +104,15 @@ Grader checks three deterministic assertions:
 
 ## Reward Function
 
-Each step returns a reward in `[0.0, 1.0]`:
+Each step returns a reward strictly in `(0, 1)` (implemented range: `[0.05, 0.95]`):
 
 ```
-Easy:   reward = (pii_removed/pii_total) * 0.9 + utility_bonus * 0.1
+Easy:   reward = (pii_removed/pii_total) * 0.9 + utility_bonus
 Medium: reward = (pii_removed/pii_total) * 0.8 + utility_ratio * 0.2
-Hard:   reward = pii_score * 0.4 + utility_score * 0.4 + length_score * 0.2
+Hard:   reward = pii_score * 0.35 + utility_score * 0.35 + forbidden_score * 0.20 + length_score * 0.10
 ```
 
-Exploit protection: if `len(redacted) < 30% of original` → reward = 0.0
+Exploit protection: if `len(redacted) < 30% of original` → reward = 0.05
 
 ---
 
