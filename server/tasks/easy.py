@@ -1,8 +1,8 @@
 """
 Task 1 — EASY: Pattern PII Redaction
 Scores strictly in (0.05, 0.95) — never 0.0 or 1.0.
-Fix: clamp ONLY the final score, not intermediate values.
 """
+
 import re
 from typing import Dict, List, Tuple
 
@@ -81,7 +81,7 @@ EASY_DOCUMENTS: List[Dict] = [
 
 
 def clamp(value: float) -> float:
-    """Clamp to strictly (0.05, 0.95) — called ONCE on final score only."""
+    """Clamp strictly between 0.05 and 0.95"""
     return round(max(0.05, min(0.95, float(value))), 4)
 
 
@@ -104,19 +104,24 @@ def get_document(step: int) -> Dict:
 
 
 def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
-    # Exploit guard
+
+    # ✅ FIXED exploit guard (uses clamp)
     if len(redacted.strip()) < 0.30 * len(original):
-        return 0.05, "Over-redaction: document too short. Only replace PII tokens.", {"exploit": "over_redaction"}
+        final_score = clamp(0.05)
+        return final_score, "Over-redaction: document too short. Only replace PII tokens.", {
+            "exploit": "over_redaction",
+            "final_score": final_score
+        }
 
     pii_items = doc["pii_items"]
     removed, missed = 0, []
+
     for item in pii_items:
         if item.lower() not in redacted.lower():
             removed += 1
         else:
             missed.append(item)
 
-    # Raw intermediate values — NOT clamped individually
     pii_ratio = removed / len(pii_items) if pii_items else 0.0
 
     utility_keywords = doc.get("utility_keywords", [])
@@ -125,7 +130,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
 
     raw = pii_ratio * 0.9 + utility_bonus
 
-    # Clamp ONCE at the end
+    # ✅ Final clamp
     final_score = clamp(raw)
 
     feedback_parts = []
@@ -143,4 +148,8 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         "utility_keywords_present": keywords_present,
         "final_score": final_score,
     }
+
+    # ✅ Safety check
+    assert 0.0 < final_score < 1.0, f"Invalid score: {final_score}"
+
     return final_score, " | ".join(feedback_parts), info
