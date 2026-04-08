@@ -11,7 +11,7 @@ Ground truth PII is defined at dataset creation time (not inferred dynamically).
 This makes the grader fully deterministic.
 
 Grader: Check what % of ground-truth contextual PII tokens are absent from redacted text.
-Exploit protection: redacted < 30% length of original → 0.0
+Exploit protection: redacted < 30% length of original → strict minimum score
 """
 
 from typing import Dict, List, Tuple
@@ -163,7 +163,7 @@ def get_document(step: int) -> Dict:
 def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     """
     Scoring breakdown:
-      - Over-redaction guard: redacted < 30% of original → 0.0
+            - Over-redaction guard: redacted < 30% of original → strict minimum score
       - PII removal score (80%): % of ground-truth PII items absent from redacted text
       - Utility preservation (20%): utility keywords still present
     """

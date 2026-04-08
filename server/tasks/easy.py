@@ -8,7 +8,7 @@ Documents contain clearly formatted, obvious PII:
   - Aadhaar numbers (Indian national ID)
 
 Grader: Check what % of planted PII tokens are gone from the redacted text.
-Exploit protection: If redacted text is < 30% length of original → score 0.0
+Exploit protection: If redacted text is < 30% length of original → strict minimum score
 """
 
 import re
@@ -156,9 +156,9 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     Returns (score, feedback, info_dict).
 
     Scoring breakdown:
-      - Over-redaction guard: if redacted < 30% length of original → 0.0
+            - Over-redaction guard: if redacted < 30% length of original → strict minimum score
       - Base score: % of planted PII items successfully removed
-      - Utility bonus: +0.1 if key utility keywords are still present
+            - Utility bonus: +0.05 if key utility keywords are still present
     """
     info = {}
 
