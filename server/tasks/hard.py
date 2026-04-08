@@ -207,6 +207,14 @@ def get_document(step: int) -> Dict:
     return HARD_DOCUMENTS[idx]
 
 
+MIN_SCORE = 0.01
+MAX_SCORE = 0.99
+
+
+def _strict_score(value: float) -> float:
+    return max(MIN_SCORE, min(MAX_SCORE, round(float(value), 4)))
+
+
 def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     feedback_parts = []
     info = {}
@@ -256,13 +264,12 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         feedback_parts.append(f"Document too short ({length_ratio:.0%}). Preserve non-PII sentences.")
 
     # ── Final score ────────────────────────────────────────────────────────────
-    final_score = min(1.0, round(
+    final_score = _strict_score(
         pii_score       * 0.35 +
         utility_score   * 0.35 +
         forbidden_score * 0.20 +
-        length_score    * 0.10,
-        4
-    ))
+        length_score    * 0.10
+    )
     info["final_score"] = final_score
 
     if not feedback_parts:

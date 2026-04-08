@@ -84,6 +84,13 @@ PHONE_RE    = re.compile(r"(\+91[-\s]?)?[6-9]\d{9}|0\d{2,4}[-\s]\d{6,8}")
 CARD_RE     = re.compile(r"\b(?:\d[ \-]?){13,16}\b")
 AADHAAR_RE  = re.compile(r"\b\d{4}\s\d{4}\s\d{4}\b")
 
+MIN_SCORE = 0.01
+MAX_SCORE = 0.99
+
+
+def _strict_score(value: float) -> float:
+    return max(MIN_SCORE, min(MAX_SCORE, round(float(value), 4)))
+
 
 def get_task_config() -> Dict:
     return {
@@ -118,7 +125,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
 
     # ── Exploit guard ─────────────────────────────────────────────────────────
     if len(redacted.strip()) < 0.30 * len(original):
-        return 0.0, "Over-redaction detected: the document is too short. Do not blank the entire document.", {"exploit": "over_redaction"}
+        return MIN_SCORE, "Over-redaction detected: the document is too short. Do not blank the entire document.", {"exploit": "over_redaction"}
 
     pii_items: List[str] = doc["pii_items"]
     removed = 0
@@ -137,7 +144,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     keywords_present = sum(1 for kw in utility_keywords if kw.lower() in redacted.lower())
     utility_bonus = 0.1 if keywords_present >= len(utility_keywords) * 0.75 else 0.0
 
-    final_score = min(1.0, round(pii_score * 0.9 + utility_bonus, 4))
+    final_score = _strict_score(pii_score * 0.9 + utility_bonus)
 
     feedback_parts = []
     if missed:
