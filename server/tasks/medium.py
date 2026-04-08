@@ -181,12 +181,12 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         else:
             missed.append(item)
 
-    pii_score = _strict_score(removed / len(pii_items) if pii_items else 1.0)
+    pii_score = _strict_score(removed / len(pii_items) if pii_items else MIN_SCORE)
 
     # Utility keywords check
     utility_keywords = doc.get("utility_keywords", [])
     keywords_present = sum(1 for kw in utility_keywords if kw.lower() in redacted.lower())
-    utility_ratio = _strict_score(keywords_present / len(utility_keywords) if utility_keywords else 1.0)
+    utility_ratio = _strict_score(keywords_present / len(utility_keywords) if utility_keywords else MIN_SCORE)
 
     final_score = _strict_score(pii_score * 0.80 + utility_ratio * 0.20)
 

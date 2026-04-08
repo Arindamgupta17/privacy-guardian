@@ -231,7 +231,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
             removed += 1
         else:
             missed.append(item)
-    pii_score = _strict_score(removed / len(pii_items) if pii_items else 1.0)
+    pii_score = _strict_score(removed / len(pii_items) if pii_items else MIN_SCORE)
     info["pii_removed"] = removed
     info["pii_total"]   = len(pii_items)
     info["pii_missed"]  = missed
@@ -241,7 +241,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     # ── B: Utility keyword preservation (35%) ─────────────────────────────────
     utility_keywords = doc["utility_keywords"]
     found_kw = [kw for kw in utility_keywords if kw.lower() in redacted_lower]
-    utility_score = _strict_score(len(found_kw) / len(utility_keywords) if utility_keywords else 1.0)
+    utility_score = _strict_score(len(found_kw) / len(utility_keywords) if utility_keywords else MIN_SCORE)
     info["utility_score"]             = utility_score
     info["utility_keywords_present"]  = len(found_kw)
     info["utility_keywords_total"]    = len(utility_keywords)
@@ -252,7 +252,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     # ── C: Forbidden removal check (20%) ──────────────────────────────────────
     forbidden = doc.get("forbidden_removals", [])
     preserved = [w for w in forbidden if w.lower() in redacted_lower]
-    forbidden_score = _strict_score(len(preserved) / len(forbidden) if forbidden else 1.0)
+    forbidden_score = _strict_score(len(preserved) / len(forbidden) if forbidden else MIN_SCORE)
     info["forbidden_score"] = forbidden_score
     if forbidden_score < 0.80:
         over_redacted = [w for w in forbidden if w.lower() not in redacted_lower]
