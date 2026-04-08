@@ -92,8 +92,8 @@ MEDIUM_DOCUMENTS: List[Dict] = [
     },
 ]
 
-MIN_SCORE = 0.05
-MAX_SCORE = 0.95
+MIN_SCORE = 0.01
+MAX_SCORE = 0.99
 
 
 def _strict_score(value: float) -> float:

@@ -84,8 +84,8 @@ PHONE_RE    = re.compile(r"(\+91[-\s]?)?[6-9]\d{9}|0\d{2,4}[-\s]\d{6,8}")
 CARD_RE     = re.compile(r"\b(?:\d[ \-]?){13,16}\b")
 AADHAAR_RE  = re.compile(r"\b\d{4}\s\d{4}\s\d{4}\b")
 
-MIN_SCORE = 0.05
-MAX_SCORE = 0.95
+MIN_SCORE = 0.01
+MAX_SCORE = 0.99
 
 
 def _strict_score(value: float) -> float:
