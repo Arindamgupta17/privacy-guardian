@@ -142,10 +142,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         feedback_parts.append("Excellent! All PII removed and document utility preserved.")
 
     info = {
-        "pii_total": len(pii_items),
-        "pii_removed": removed,
         "pii_missed": missed,
-        "utility_keywords_present": keywords_present,
         "final_score": final_score,
     }
 

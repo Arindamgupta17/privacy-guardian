@@ -96,8 +96,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         feedback_parts.append("Excellent redaction")
 
     info = {
-        "pii_removed": removed,
-        "pii_total": len(pii_items),
+        "pii_missed": missed,
         "final_score": final_score
     }
 
