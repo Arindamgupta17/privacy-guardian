@@ -199,12 +199,9 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         feedback_parts.append("All contextual PII redacted and document utility preserved. Well done!")
 
     info = {
-        "pii_total": len(pii_items),
-        "pii_removed": removed,
         "pii_missed": missed,
         "utility_ratio": _strict_score(utility_ratio),
         "pii_score": _strict_score(pii_score),
-        "final_score": final_score,
     }
 
     return final_score, " | ".join(feedback_parts), info

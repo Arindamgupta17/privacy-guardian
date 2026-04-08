@@ -232,8 +232,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         else:
             missed.append(item)
     pii_score = _strict_score(removed / len(pii_items) if pii_items else MIN_SCORE)
-    info["pii_removed"] = removed
-    info["pii_total"]   = len(pii_items)
+    info["pii_score"]  = pii_score
     info["pii_missed"]  = missed
     if missed:
         feedback_parts.append(f"PII still present ({len(missed)}): {missed[:2]}{'...' if len(missed)>2 else ''}")
@@ -242,9 +241,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     utility_keywords = doc["utility_keywords"]
     found_kw = [kw for kw in utility_keywords if kw.lower() in redacted_lower]
     utility_score = _strict_score(len(found_kw) / len(utility_keywords) if utility_keywords else MIN_SCORE)
-    info["utility_score"]             = utility_score
-    info["utility_keywords_present"]  = len(found_kw)
-    info["utility_keywords_total"]    = len(utility_keywords)
+    info["utility_score"] = utility_score
     if utility_score < 0.75:
         missing_kw = [kw for kw in utility_keywords if kw.lower() not in redacted_lower]
         feedback_parts.append(f"Lost analytical keywords: {missing_kw[:3]} — preserve these.")
@@ -262,7 +259,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     min_ratio = doc.get("min_length_ratio", 0.50)
     length_ratio = len(redacted.strip()) / max(len(original), 1)
     length_score = _strict_score(MAX_SCORE if length_ratio >= min_ratio else max(MIN_SCORE, length_ratio / min_ratio))
-    info["length_ratio"] = _strict_score(length_ratio)
+    info["length_score"] = length_score
     if length_score < MAX_SCORE:
         feedback_parts.append(f"Document too short ({length_ratio:.0%}). Preserve non-PII sentences.")
 
@@ -273,7 +270,6 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         forbidden_score * 0.20 +
         length_score    * 0.10
     )
-    info["final_score"] = final_score
 
     if not feedback_parts:
         feedback_parts.append(
