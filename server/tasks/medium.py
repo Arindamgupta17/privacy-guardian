@@ -77,8 +77,12 @@ MEDIUM_DOCUMENTS: List[Dict] = [
 ]
 
 
+MIN_SCORE = 0.05
+MAX_SCORE = 0.95
+
+
 def clamp(value: float) -> float:
-    return round(max(0.05, min(0.95, float(value))), 4)
+    return round(max(MIN_SCORE, min(MAX_SCORE, float(value))), 4)
 
 
 def get_task_config() -> Dict:
@@ -101,7 +105,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
 
     # ✅ FIXED exploit guard (IMPORTANT)
     if len(redacted.strip()) < 0.30 * len(original):
-        final_score = clamp(0.05)
+        final_score = clamp(MIN_SCORE)
         return final_score, "Over-redaction: document too short.", {
             "exploit": "over_redaction",
             "final_score": final_score
@@ -116,11 +120,11 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         else:
             missed.append(item)
 
-    pii_ratio = removed / len(pii_items) if pii_items else 0.0
+    pii_ratio = removed / len(pii_items) if pii_items else MIN_SCORE
 
     utility_keywords = doc.get("utility_keywords", [])
     keywords_present = sum(1 for kw in utility_keywords if kw.lower() in redacted.lower())
-    utility_ratio = keywords_present / len(utility_keywords) if utility_keywords else 0.0
+    utility_ratio = keywords_present / len(utility_keywords) if utility_keywords else MIN_SCORE
 
     raw = pii_ratio * 0.80 + utility_ratio * 0.20
 
@@ -140,6 +144,6 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     }
 
     # ✅ SAFETY CHECK
-    assert 0.0 < final_score < 1.0, f"Invalid score: {final_score}"
+    assert MIN_SCORE <= final_score <= MAX_SCORE, f"Invalid score: {final_score}"
 
     return final_score, " | ".join(feedback_parts), info

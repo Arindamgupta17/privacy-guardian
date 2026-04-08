@@ -16,8 +16,12 @@ HARD_DOCUMENTS: List[Dict] = [
     }
 ]
 
+MIN_SCORE = 0.05
+MAX_SCORE = 0.95
+
+
 def clamp(value: float) -> float:
-    return round(max(0.05, min(0.95, float(value))), 4)
+    return round(max(MIN_SCORE, min(MAX_SCORE, float(value))), 4)
 
 def get_task_config() -> Dict:
     return {
@@ -34,7 +38,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
 
     # ✅ FIXED exploit guard (CRITICAL)
     if len(redacted.strip()) < 0.30 * len(original):
-        final_score = clamp(0.05)
+        final_score = clamp(MIN_SCORE)
         return final_score, "Over-redaction: document too short.", {
             "exploit": "over_redaction",
             "final_score": final_score
@@ -53,7 +57,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         else:
             missed.append(item)
 
-    pii_ratio = removed / len(pii_items) if pii_items else 0.0
+    pii_ratio = removed / len(pii_items) if pii_items else MIN_SCORE
 
     if missed:
         feedback_parts.append(f"PII still present: {missed[:2]}")
@@ -61,7 +65,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     # B: Utility preservation
     utility_keywords = doc["utility_keywords"]
     found_kw = [kw for kw in utility_keywords if kw.lower() in redacted_lower]
-    utility_ratio = len(found_kw) / len(utility_keywords) if utility_keywords else 0.0
+    utility_ratio = len(found_kw) / len(utility_keywords) if utility_keywords else MIN_SCORE
 
     if utility_ratio < 0.75:
         feedback_parts.append("Lost important keywords")
@@ -69,7 +73,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     # C: Forbidden removal
     forbidden = doc.get("forbidden_removals", [])
     preserved = [w for w in forbidden if w.lower() in redacted_lower]
-    forbidden_ratio = len(preserved) / len(forbidden) if forbidden else 1.0
+    forbidden_ratio = len(preserved) / len(forbidden) if forbidden else MIN_SCORE
 
     if forbidden_ratio < 0.80:
         feedback_parts.append("Over-redacted important info")
@@ -77,9 +81,9 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     # D: Length preservation
     min_ratio = doc.get("min_length_ratio", 0.50)
     length_ratio = len(redacted.strip()) / max(len(original), 1)
-    length_score = 1.0 if length_ratio >= min_ratio else max(0.0, length_ratio / min_ratio)
+    length_score = MAX_SCORE if length_ratio >= min_ratio else max(MIN_SCORE, length_ratio / min_ratio)
 
-    if length_score < 1.0:
+    if length_score < MAX_SCORE:
         feedback_parts.append("Document too short")
 
     # Final weighted score
@@ -101,6 +105,6 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     }
 
     # ✅ SAFETY CHECK
-    assert 0.0 < final_score < 1.0, f"Invalid score: {final_score}"
+    assert MIN_SCORE <= final_score <= MAX_SCORE, f"Invalid score: {final_score}"
 
     return final_score, " | ".join(feedback_parts), info
