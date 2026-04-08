@@ -231,7 +231,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
             removed += 1
         else:
             missed.append(item)
-    pii_score = removed / len(pii_items) if pii_items else 1.0
+    pii_score = _strict_score(removed / len(pii_items) if pii_items else 1.0)
     info["pii_removed"] = removed
     info["pii_total"]   = len(pii_items)
     info["pii_missed"]  = missed
@@ -241,8 +241,8 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     # ── B: Utility keyword preservation (35%) ─────────────────────────────────
     utility_keywords = doc["utility_keywords"]
     found_kw = [kw for kw in utility_keywords if kw.lower() in redacted_lower]
-    utility_score = len(found_kw) / len(utility_keywords) if utility_keywords else 1.0
-    info["utility_score"]             = _strict_score(utility_score)
+    utility_score = _strict_score(len(found_kw) / len(utility_keywords) if utility_keywords else 1.0)
+    info["utility_score"]             = utility_score
     info["utility_keywords_present"]  = len(found_kw)
     info["utility_keywords_total"]    = len(utility_keywords)
     if utility_score < 0.75:
@@ -252,8 +252,8 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     # ── C: Forbidden removal check (20%) ──────────────────────────────────────
     forbidden = doc.get("forbidden_removals", [])
     preserved = [w for w in forbidden if w.lower() in redacted_lower]
-    forbidden_score = len(preserved) / len(forbidden) if forbidden else 1.0
-    info["forbidden_score"] = _strict_score(forbidden_score)
+    forbidden_score = _strict_score(len(preserved) / len(forbidden) if forbidden else 1.0)
+    info["forbidden_score"] = forbidden_score
     if forbidden_score < 0.80:
         over_redacted = [w for w in forbidden if w.lower() not in redacted_lower]
         feedback_parts.append(f"Over-redacted non-PII: {over_redacted[:3]} — do not remove these.")
@@ -261,7 +261,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     # ── D: Length preservation (10%) ──────────────────────────────────────────
     min_ratio = doc.get("min_length_ratio", 0.50)
     length_ratio = len(redacted.strip()) / max(len(original), 1)
-    length_score = 1.0 if length_ratio >= min_ratio else max(0.0, length_ratio / min_ratio)
+    length_score = _strict_score(1.0 if length_ratio >= min_ratio else max(0.0, length_ratio / min_ratio))
     info["length_ratio"] = _strict_score(length_ratio)
     if length_score < 1.0:
         feedback_parts.append(f"Document too short ({length_ratio:.0%}). Preserve non-PII sentences.")
