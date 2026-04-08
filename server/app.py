@@ -141,6 +141,23 @@ async def metadata():
     }
 
 
+@app.get("/spec")
+async def spec():
+    """Compatibility endpoint for validators that expect /spec."""
+    return {
+        "name": "privacy-guardian-env",
+        "reward_range": [0.05, 0.95],
+        "episode_steps": 3,
+        "tasks": [
+            "pattern_redaction",
+            "contextual_redaction",
+            "utility_preserving_redaction",
+        ],
+        "observation_type": "text",
+        "action_schema": {"redacted_text": "string"},
+    }
+
+
 # ── FIX 3: /schema ────────────────────────────────────────────────────────────
 @app.get("/schema")
 async def schema():
