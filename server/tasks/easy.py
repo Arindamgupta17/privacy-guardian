@@ -130,7 +130,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
 
     utility_keywords = doc.get("utility_keywords", [])
     keywords_present = sum(1 for kw in utility_keywords if kw.lower() in redacted.lower())
-    utility_bonus = MIN_SCORE if keywords_present < len(utility_keywords) * 0.75 else MIN_SCORE
+    utility_bonus = 0.10 if keywords_present >= len(utility_keywords) * 0.75 else MIN_SCORE
 
     raw = pii_ratio * 0.9 + utility_bonus
 
