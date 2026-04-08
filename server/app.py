@@ -26,6 +26,10 @@ from .models import (
 env = PrivacyGuardianEnvironment()
 
 
+def _strict_api_score(value: float) -> float:
+    return max(0.05, min(0.95, round(float(value), 4)))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize environment on startup."""
@@ -91,6 +95,11 @@ async def step(action: RedactionAction):
     """Submit a redacted document and receive reward + next observation."""
     try:
         result = env.step(action)
+        # Final API-layer safety clamp for validators that read response fields directly.
+        result.reward = _strict_api_score(result.reward)
+        result.observation.last_reward = _strict_api_score(result.observation.last_reward)
+        if isinstance(result.info, dict) and "final_score" in result.info:
+            result.info["final_score"] = _strict_api_score(result.info["final_score"])
         return result
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
