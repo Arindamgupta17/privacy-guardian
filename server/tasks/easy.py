@@ -188,7 +188,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     feedback_parts = []
     if missed:
         feedback_parts.append(f"Missed PII: {missed}")
-    if utility_bonus == 0.0:
+    if keywords_present < len(utility_keywords) * 0.75:
         feedback_parts.append("Some utility keywords were removed — preserve non-PII content.")
     if not feedback_parts:
         feedback_parts.append("Excellent redaction! All PII removed and document utility preserved.")
