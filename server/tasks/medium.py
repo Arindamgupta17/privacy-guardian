@@ -90,6 +90,45 @@ MEDIUM_DOCUMENTS: List[Dict] = [
         ],
         "utility_keywords": ["migraine", "hypertension", "diagnosis", "prescribed", "topiramate"],
     },
+    {
+        "id": "medium_004",
+        "text": (
+            "Insurance Escalation Notes\n\n"
+            "The claimant Neelima Rao called regarding a delayed settlement. "
+            "She said her brother Harish submitted documents from Mysuru last week. "
+            "Their family consultant Vivek from Jayanagar confirmed the policy copy was valid. "
+            "Neelima requested priority review before month-end closure."
+        ),
+        "pii_items": [
+            "Neelima Rao",
+            "Neelima",
+            "Harish",
+            "Mysuru",
+            "Vivek",
+            "Jayanagar",
+        ],
+        "utility_keywords": ["claimant", "settlement", "documents", "policy", "priority"],
+    },
+    {
+        "id": "medium_005",
+        "text": (
+            "Vendor Risk Review Summary\n\n"
+            "During the review, consultant Farhan Ali noted that operations head Lata Menon "
+            "had approved access changes from the Kochi branch. "
+            "Farhan mentioned that coordinator Joseph from Ernakulam tracked the incident timeline. "
+            "Lata asked the audit team to finalize the mitigation report by Friday."
+        ),
+        "pii_items": [
+            "Farhan Ali",
+            "Farhan",
+            "Lata Menon",
+            "Lata",
+            "Kochi",
+            "Joseph",
+            "Ernakulam",
+        ],
+        "utility_keywords": ["review", "operations", "incident", "audit", "mitigation"],
+    },
 ]
 
 MIN_SCORE = 0.05

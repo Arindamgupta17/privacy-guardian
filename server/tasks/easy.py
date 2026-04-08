@@ -76,6 +76,45 @@ EASY_DOCUMENTS: List[Dict] = [
         ],
         "utility_keywords": ["transaction", "amazon", "banking", "helpline"],
     },
+    {
+        "id": "easy_004",
+        "text": (
+            "Courier Delivery Update\n\n"
+            "Hi Nisha, your package #PKG-7712 is out for delivery. "
+            "For delivery coordination, contact nisha.kapoor@mail.com or call 9987654321. "
+            "Backup contact: +91 91234 56789. "
+            "Payment was processed using card 6011 0009 9013 9424. "
+            "Delivery location: 9, Residency Road, Jaipur. "
+            "Please keep OTP ready at the time of handover."
+        ),
+        "pii_items": [
+            "nisha.kapoor@mail.com",
+            "9987654321",
+            "+91 91234 56789",
+            "6011 0009 9013 9424",
+        ],
+        "utility_keywords": ["delivery", "package", "payment", "otp"],
+    },
+    {
+        "id": "easy_005",
+        "text": (
+            "Utility Bill Reminder\n\n"
+            "Dear customer, your electricity bill for April is pending. "
+            "Registered user: Arjun Mehta. "
+            "Email: arjun.mehta@provider.net. "
+            "Registered mobile: 9090909090. "
+            "Customer support helpline: 022-44556677. "
+            "Aadhaar linked to account: 4567 8912 3456. "
+            "Kindly pay before due date to avoid late fee."
+        ),
+        "pii_items": [
+            "arjun.mehta@provider.net",
+            "9090909090",
+            "022-44556677",
+            "4567 8912 3456",
+        ],
+        "utility_keywords": ["bill", "electricity", "due date", "late fee"],
+    },
 ]
 
 # ── Regex patterns for common PII ─────────────────────────────────────────────

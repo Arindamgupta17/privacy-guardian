@@ -216,6 +216,9 @@ def _strict_score(value: float) -> float:
 
 
 def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
+    if len(redacted.strip()) < 0.30 * len(original):
+        return MIN_SCORE, "Over-redaction: document too short. Preserve non-PII content.", {"exploit": "over_redaction"}
+
     feedback_parts = []
     info = {}
     redacted_lower = redacted.lower()
