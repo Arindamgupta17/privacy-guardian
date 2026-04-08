@@ -159,7 +159,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         "pii_removed": removed,
         "pii_missed": missed,
         "utility_keywords_present": keywords_present,
-        "pii_score": round(pii_score, 4),
+        "pii_score": _strict_score(pii_score),
         "utility_bonus": utility_bonus,
     }
 

@@ -66,7 +66,7 @@ class PrivacyGuardianEnvironment:
             task_description=config["description"],
             pii_categories=config["pii_categories"],
             step=self._step,
-            last_reward=0.0,
+            last_reward=STRICT_MIN_REWARD,
             feedback="New episode started. Redact all PII from the document above.",
         )
         return ResetResult(observation=obs)

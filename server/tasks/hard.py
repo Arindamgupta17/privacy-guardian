@@ -239,7 +239,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     utility_keywords = doc["utility_keywords"]
     found_kw = [kw for kw in utility_keywords if kw.lower() in redacted_lower]
     utility_score = len(found_kw) / len(utility_keywords) if utility_keywords else 1.0
-    info["utility_score"]             = round(utility_score, 4)
+    info["utility_score"]             = _strict_score(utility_score)
     info["utility_keywords_present"]  = len(found_kw)
     info["utility_keywords_total"]    = len(utility_keywords)
     if utility_score < 0.75:
@@ -250,7 +250,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     forbidden = doc.get("forbidden_removals", [])
     preserved = [w for w in forbidden if w.lower() in redacted_lower]
     forbidden_score = len(preserved) / len(forbidden) if forbidden else 1.0
-    info["forbidden_score"] = round(forbidden_score, 4)
+    info["forbidden_score"] = _strict_score(forbidden_score)
     if forbidden_score < 0.80:
         over_redacted = [w for w in forbidden if w.lower() not in redacted_lower]
         feedback_parts.append(f"Over-redacted non-PII: {over_redacted[:3]} — do not remove these.")
@@ -259,7 +259,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     min_ratio = doc.get("min_length_ratio", 0.50)
     length_ratio = len(redacted.strip()) / max(len(original), 1)
     length_score = 1.0 if length_ratio >= min_ratio else max(0.0, length_ratio / min_ratio)
-    info["length_ratio"] = round(length_ratio, 4)
+    info["length_ratio"] = _strict_score(length_ratio)
     if length_score < 1.0:
         feedback_parts.append(f"Document too short ({length_ratio:.0%}). Preserve non-PII sentences.")
 

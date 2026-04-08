@@ -49,8 +49,10 @@ class RedactionObservation(BaseModel):
     )
     step: int = Field(..., description="Current step number within the episode.")
     last_reward: float = Field(
-        0.0,
-        description="Reward from the previous step. 0.0 at episode start."
+        0.01,
+        gt=0,
+        lt=1,
+        description="Reward from the previous step, strictly between 0 and 1."
     )
     feedback: Optional[str] = Field(
         None,
@@ -83,7 +85,7 @@ class RedactionState(BaseModel):
 
 class StepResult(BaseModel):
     observation: RedactionObservation
-    reward: float = Field(..., description="Reward for this step, in [0.0, 1.0].")
+    reward: float = Field(..., gt=0, lt=1, description="Reward for this step, strictly between 0 and 1.")
     done: bool = Field(..., description="True if the episode is over.")
     info: Dict[str, Any] = Field(default_factory=dict, description="Extra diagnostic info.")
 
