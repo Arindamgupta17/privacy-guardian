@@ -41,8 +41,8 @@ MAX_STEPS               = 3
 TEMPERATURE             = 0.2
 MAX_TOKENS              = 1000
 SUCCESS_SCORE_THRESHOLD = 0.5
-MIN_LOG_SCORE = 0.01
-MAX_LOG_SCORE = 0.99
+MIN_LOG_SCORE = 0.05
+MAX_LOG_SCORE = 0.95
 
 
 def strict_score(value: float) -> float:
