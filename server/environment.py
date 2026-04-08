@@ -21,8 +21,8 @@ from .tasks import TASK_MAP
 
 # Task order for sequential episode flow
 TASK_ORDER = ["pattern_redaction", "contextual_redaction", "utility_preserving_redaction"]
-STRICT_MIN_REWARD = 0.01
-STRICT_MAX_REWARD = 0.99
+STRICT_MIN_REWARD = 0.05
+STRICT_MAX_REWARD = 0.95
 
 
 def _clamp_strict_score(value: float) -> float:

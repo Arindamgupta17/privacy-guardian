@@ -128,7 +128,7 @@ async def metadata():
             {"name": "contextual_redaction",         "difficulty": "medium"},
             {"name": "utility_preserving_redaction", "difficulty": "hard"},
         ],
-        "reward_range": [0.01, 0.99],
+        "reward_range": [0.05, 0.95],
     }
 
 
@@ -298,11 +298,13 @@ async def list_tasks():
 
 def main() -> None:
     """Run the FastAPI app via Uvicorn."""
+    import os
     import subprocess
     import sys
+    port = os.getenv("PORT", "7860")
 
     subprocess.run(
-        [sys.executable, "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8000"],
+        [sys.executable, "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", port],
         check=True,
     )
 
