@@ -263,7 +263,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     length_ratio = len(redacted.strip()) / max(len(original), 1)
     length_score = _strict_score(MAX_SCORE if length_ratio >= min_ratio else max(MIN_SCORE, length_ratio / min_ratio))
     info["length_ratio"] = _strict_score(length_ratio)
-    if length_score < 1.0:
+    if length_score < MAX_SCORE:
         feedback_parts.append(f"Document too short ({length_ratio:.0%}). Preserve non-PII sentences.")
 
     # ── Final score ────────────────────────────────────────────────────────────
