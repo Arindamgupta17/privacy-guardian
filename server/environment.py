@@ -39,6 +39,7 @@ class PrivacyGuardianEnvironment:
         self._max_steps: int = 3
         self._done: bool = True
         self._total_reward: float = 0.0
+        self._reward_count: int = 0
         self._current_doc: Optional[dict] = None
         self._last_action: Optional[str] = None
         self._pii_found: int = 0
@@ -50,6 +51,7 @@ class PrivacyGuardianEnvironment:
         self._step = 0
         self._done = False
         self._total_reward = 0.0
+        self._reward_count = 0
         self._last_action = None
         self._pii_found = 0
 
@@ -92,7 +94,8 @@ class PrivacyGuardianEnvironment:
         reward = _clamp_strict_score(reward)
 
         self._total_reward += reward
-        self._pii_found += info.get("pii_removed", 0)
+        self._reward_count += 1
+        self._pii_found += max(0, len(self._current_doc.get("pii_items", [])) - len(info.get("pii_missed", [])))
 
         # Move to next document or end episode
         if self._step >= self._max_steps:
@@ -123,13 +126,18 @@ class PrivacyGuardianEnvironment:
     # ── state ──────────────────────────────────────────────────────────────────
     def state(self) -> RedactionState:
         pii_total = len(self._current_doc["pii_items"]) if self._current_doc else 0
+        avg_reward = (
+            _clamp_strict_score(self._total_reward / self._reward_count)
+            if self._reward_count > 0
+            else STRICT_MIN_REWARD
+        )
         return RedactionState(
             episode_id=self._episode_id,
             task_name=self._task_name,
             step=self._step,
             max_steps=self._max_steps,
             done=self._done,
-            total_reward=round(self._total_reward, 4),
+            total_reward=avg_reward,
             pii_items_total=pii_total,
             pii_items_found=self._pii_found,
             last_action=self._last_action,
