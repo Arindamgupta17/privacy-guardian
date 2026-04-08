@@ -256,14 +256,14 @@ async def main() -> None:
         else:
             print("[DEBUG] WARNING: Environment health check failed — proceeding anyway", flush=True)
 
-        # Run all 3 tasks sequentially
+       
         all_results = []
         for task_name in TASK_NAMES:
             result = await run_task(http, http, task_name)
             all_results.append(result)
             await asyncio.sleep(1)
 
-        # Summary
+       
         print("\n[DEBUG] ====== SUMMARY ======", flush=True)
         for r in all_results:
             avg = sum(r["rewards"]) / len(r["rewards"]) if r["rewards"] else MIN_LOG_SCORE
