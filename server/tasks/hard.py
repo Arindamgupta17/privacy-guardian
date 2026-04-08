@@ -217,7 +217,7 @@ def _strict_score(value: float) -> float:
 
 def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
     if len(redacted.strip()) < 0.30 * len(original):
-        return MIN_SCORE, "Over-redaction: document too short. Preserve non-PII content.", {"exploit": "over_redaction"}
+        return MIN_SCORE, "Over-redaction: document too short. Preserve non-PII content.", {"exploit": "over_redaction", "final_score": MIN_SCORE}
 
     feedback_parts = []
     info = {}
@@ -270,6 +270,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         forbidden_score * 0.20 +
         length_score    * 0.10
     )
+    info["final_score"] = final_score
 
     if not feedback_parts:
         feedback_parts.append(

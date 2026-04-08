@@ -164,7 +164,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
 
     # ── Exploit guard ─────────────────────────────────────────────────────────
     if len(redacted.strip()) < 0.30 * len(original):
-        return MIN_SCORE, "Over-redaction detected: the document is too short. Do not blank the entire document.", {"exploit": "over_redaction"}
+        return MIN_SCORE, "Over-redaction detected: the document is too short. Do not blank the entire document.", {"exploit": "over_redaction", "final_score": MIN_SCORE}
 
     pii_items: List[str] = doc["pii_items"]
     removed = 0
@@ -197,6 +197,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         "pii_missed": missed,
         "pii_score": _strict_score(pii_score),
         "utility_bonus": _strict_score(utility_bonus),
+        "final_score": final_score,
     }
 
     return final_score, " | ".join(feedback_parts), info

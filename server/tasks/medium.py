@@ -168,7 +168,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
       - Utility preservation (20%): utility keywords still present
     """
     if len(redacted.strip()) < 0.30 * len(original):
-        return MIN_SCORE, "Over-redaction: document too short. Preserve non-PII content.", {"exploit": "over_redaction"}
+        return MIN_SCORE, "Over-redaction: document too short. Preserve non-PII content.", {"exploit": "over_redaction", "final_score": MIN_SCORE}
 
     pii_items: List[str] = doc["pii_items"]
     removed = 0
@@ -202,6 +202,7 @@ def score(original: str, redacted: str, doc: Dict) -> Tuple[float, str, Dict]:
         "pii_missed": missed,
         "utility_ratio": _strict_score(utility_ratio),
         "pii_score": _strict_score(pii_score),
+        "final_score": final_score,
     }
 
     return final_score, " | ".join(feedback_parts), info
